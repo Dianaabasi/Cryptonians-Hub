@@ -4,7 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { ConfirmModal } from "@/components/ui/Modals";
 import Constants from "expo-constants";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import {
   Bell,
   ChevronRight,
@@ -15,7 +15,7 @@ import {
   Moon,
   Shield
 } from "lucide-react-native";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   Image,
   ScrollView,
@@ -41,6 +41,33 @@ export default function SettingsScreen() {
     router.replace("/(auth)/onboarding");
   };
 
+  const [supportDot, setSupportDot] = useState(false);
+  const isStaff = profile?.role === "admin" || profile?.role === "mod";
+
+  // Check for unread support activity
+  const checkSupportDot = useCallback(async () => {
+    if (!profile?.id) return;
+    if (isStaff) {
+      // Admin/mod: any open ticket means action needed
+      const { count } = await supabase
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open");
+      setSupportDot((count ?? 0) > 0);
+    } else {
+      // Member: any ticket marked as in_progress indicates a staff reply
+      const { count } = await supabase
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("status", "in_progress");
+      setSupportDot((count ?? 0) > 0);
+    }
+  }, [profile?.id, profile?.role]);
+
+  useFocusEffect(useCallback(() => { checkSupportDot(); }, [checkSupportDot]));
+
+
   const OptionRow = ({ icon: Icon, title, onPress, rightElement }: any) => (
     <TouchableOpacity
       onPress={onPress}
@@ -57,6 +84,9 @@ export default function SettingsScreen() {
         >
           {title}
         </Text>
+        {title.includes("Support") && supportDot && (
+          <View className="w-2 h-2 rounded-full bg-[#6C63FF] ml-2" />
+        )}
       </View>
       {rightElement || <ChevronRight size={20} color={colors.textSecondary} />}
     </TouchableOpacity>
@@ -163,7 +193,7 @@ export default function SettingsScreen() {
         </Text>
         <OptionRow
           icon={HelpCircle}
-          title="Help Center"
+          title={isStaff ? "Support Inbox" : "Support"}
           onPress={() => router.push("/support")}
         />
         <OptionRow

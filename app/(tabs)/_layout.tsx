@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect, useCallback } from "react";
 import { Tabs } from "expo-router";
+import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/stores/authStore";
 import {
   Home,
   MessageCircle,
@@ -13,7 +15,57 @@ import { Colors } from "@/constants/Colors";
 
 export default function TabLayout() {
   const { theme } = useThemeStore();
-  const { isTabBarVisible, unreadDmCount } = useUIStore();
+  const { profile } = useAuthStore();
+  const { isTabBarVisible, unreadDmCount, setUnreadDmCount } = useUIStore();
+
+  const fetchGlobalUnreadChats = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      const { data: participations } = await supabase
+        .from("chat_participants")
+        .select("chat_id, last_read_at")
+        .eq("user_id", profile.id);
+
+      if (!participations?.length) {
+        setUnreadDmCount(0);
+        return;
+      }
+
+      const chatIds = participations.map((p) => p.chat_id);
+
+      const { data: recentMsgs } = await supabase
+        .from("chat_messages")
+        .select("chat_id, created_at, sender_id")
+        .in("chat_id", chatIds)
+        .order("created_at", { ascending: false });
+
+      if (!recentMsgs) return;
+
+      const latestPerChat = new Map();
+      for (const m of recentMsgs) {
+        if (!latestPerChat.has(m.chat_id)) latestPerChat.set(m.chat_id, m);
+      }
+
+      let unread = 0;
+      for (const p of participations) {
+        const msg = latestPerChat.get(p.chat_id);
+        if (!msg || msg.sender_id === profile.id) continue;
+        if (
+          !p.last_read_at ||
+          new Date(msg.created_at) > new Date(p.last_read_at)
+        ) {
+          unread++;
+        }
+      }
+      setUnreadDmCount(unread);
+    } catch (err) {
+      console.error("Global chat unread check error:", err);
+    }
+  }, [profile?.id]);
+
+  useEffect(() => {
+    fetchGlobalUnreadChats();
+  }, [fetchGlobalUnreadChats]);
   const colors = theme === "dark" ? Colors.dark : Colors.light;
   const isDark = theme === "dark";
 

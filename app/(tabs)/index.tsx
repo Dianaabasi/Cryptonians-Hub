@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, Image, TouchableOpacity, RefreshControl, FlatList } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -22,6 +23,31 @@ export default function HomeScreen() {
   const [posts, setPosts] = useState<PostType[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [supportDot, setSupportDot] = useState(false);
+
+  // Check for unread support activity
+  const checkSupportDot = useCallback(async () => {
+    if (!profile?.id) return;
+    const isStaff = profile.role === "admin" || profile.role === "mod";
+    if (isStaff) {
+      // Admin/mod: any open ticket means action needed
+      const { count } = await supabase
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "open");
+      setSupportDot((count ?? 0) > 0);
+    } else {
+      // Member: any ticket marked as in_progress indicates a staff reply
+      const { count } = await supabase
+        .from("support_tickets")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", profile.id)
+        .eq("status", "in_progress");
+      setSupportDot((count ?? 0) > 0);
+    }
+  }, [profile?.id, profile?.role]);
+
+  useFocusEffect(useCallback(() => { checkSupportDot(); }, [checkSupportDot]));
 
   const fetchPosts = async () => {
     try {
@@ -115,7 +141,15 @@ export default function HomeScreen() {
           </Link>
           <Link href="/support" asChild>
             <TouchableOpacity className="p-2 -mr-2">
-              <Headphones size={24} color={colors.text} />
+              <View>
+                <Headphones size={24} color={colors.text} />
+                {supportDot && (
+                  <View
+                    className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
+                    style={{ backgroundColor: "#6C63FF", borderColor: colors.background }}
+                  />
+                )}
+              </View>
             </TouchableOpacity>
           </Link>
         </View>
