@@ -1,57 +1,110 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
-
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+import React from "react";
+import { Tabs } from "expo-router";
+import {
+  Home,
+  MessageCircle,
+  Users,
+  BookOpen,
+  Settings,
+} from "lucide-react-native";
+import { useThemeStore } from "@/stores/themeStore";
+import { useUIStore } from "@/stores/uiStore";
+import { Colors } from "@/constants/Colors";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const { theme } = useThemeStore();
+  const { isTabBarVisible, unreadDmCount } = useUIStore();
+  const colors = theme === "dark" ? Colors.dark : Colors.light;
+  const isDark = theme === "dark";
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerShown: false,
+        tabBarActiveTintColor: colors.tabIconSelected,
+        tabBarInactiveTintColor: colors.tabIconDefault,
+        tabBarStyle: {
+          display: isTabBarVisible ? "flex" : "none",
+          position: "absolute",
+          bottom: 20,
+          left: 20,
+          right: 20,
+          backgroundColor: isDark ? "#1C1C1E" : "#FFFFFF",
+          borderTopWidth: 0,
+          borderRadius: 30,
+          height: 65,
+          paddingBottom: 0,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.15,
+          shadowRadius: 15,
+          elevation: 10,
+        },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: "600",
+          marginTop: 2,
+        },
+        tabBarItemStyle: {
+          justifyContent: "center",
+          alignItems: "center",
+          paddingTop: 8,
+          paddingBottom: 8,
+        },
+        tabBarBadgeStyle: {
+          backgroundColor: "#6C63FF",
+          color: "#FFF",
+          fontSize: 10,
+          minWidth: 18,
+          height: 18,
+          lineHeight: 18,
+        },
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          title: "Home",
+          tabBarIcon: ({ color, size }) => (
+            <Home size={size} color={color} strokeWidth={1.8} />
           ),
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="chats"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: "Chats",
+          tabBarBadge: unreadDmCount > 0 ? unreadDmCount : undefined,
+          tabBarIcon: ({ color, size }) => (
+            <MessageCircle size={size} color={color} strokeWidth={1.8} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="niches"
+        options={{
+          title: "Niches",
+          tabBarIcon: ({ color, size }) => (
+            <Users size={size} color={color} strokeWidth={1.8} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="education"
+        options={{
+          title: "Education",
+          tabBarIcon: ({ color, size }) => (
+            <BookOpen size={size} color={color} strokeWidth={1.8} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: "Settings",
+          tabBarIcon: ({ color, size }) => (
+            <Settings size={size} color={color} strokeWidth={1.8} />
+          ),
         }}
       />
     </Tabs>
