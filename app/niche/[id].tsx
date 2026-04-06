@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView, RefreshControl,
-  Image, ActivityIndicator, Alert
+  Image, ActivityIndicator, Alert, Modal, Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -11,9 +11,177 @@ import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { Colors } from "@/constants/Colors";
 import { supabase } from "@/lib/supabase";
-import { ArrowLeft, Hash, ShieldAlert, Bell, Plus, Camera } from "lucide-react-native";
+import { ArrowLeft, Hash, ShieldAlert, Bell, Plus, Camera, UserCheck, X, CheckCircle, XCircle, Users } from "lucide-react-native";
 import { PostCard, PostType } from "@/components/ui/PostCard";
 import { SkeletonNicheDetail } from "@/components/ui/SkeletonLoader";
+
+function RequestsModal({
+  visible,
+  onClose,
+  nicheId,
+  isDark,
+  colors,
+  onActionComplete,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  nicheId: string | null;
+  isDark: boolean;
+  colors: any;
+  onActionComplete: () => void;
+}) {
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible && nicheId) {
+      loadRequests();
+    }
+  }, [visible, nicheId]);
+
+  const loadRequests = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("niche_join_requests")
+        .select(`
+          id,
+          user_id,
+          profiles(full_name, avatar_url, username)
+        `)
+        .eq("niche_id", nicheId)
+        .eq("status", "pending")
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Could not load requests.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAction = async (requestId: string, userId: string, action: "approve" | "reject") => {
+    if (!nicheId) return;
+    setProcessingId(requestId);
+    try {
+      if (action === "approve") {
+        // Add to memberships
+        const { error: joinError } = await supabase
+          .from("niche_memberships")
+          .insert({ niche_id: nicheId, user_id: userId });
+        if (joinError) throw joinError;
+
+        // Auto-add to chat room if exists
+        const { data: nicheRoom } = await supabase
+          .from("chat_rooms")
+          .select("id")
+          .eq("niche_id", nicheId)
+          .eq("is_direct", false)
+          .limit(1)
+          .maybeSingle();
+
+        if (nicheRoom) {
+          await supabase
+            .from("chat_participants")
+            .insert({ chat_id: nicheRoom.id, user_id: userId });
+        }
+      }
+
+      // 3. Remove the request
+      const { error: deleteError } = await supabase
+        .from("niche_join_requests")
+        .delete()
+        .eq("id", requestId);
+      if (deleteError) throw deleteError;
+
+      // Update UI
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      onActionComplete();
+      
+      // Auto close if empty
+      if (requests.length <= 1) {
+        onClose();
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", `Could not ${action} request.`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <View className="flex-1 justify-end bg-black/50">
+        <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onClose} />
+        <View className="rounded-t-3xl p-6 min-h-[50%]" style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFF", paddingBottom: Platform.OS === "ios" ? 40 : 24 }}>
+          <View className="w-10 h-1 rounded-full bg-gray-400/40 self-center mb-6" />
+          
+          <View className="flex-row justify-between items-center mb-6">
+            <Text className="text-xl font-bold" style={{ color: colors.text }}>Join Requests</Text>
+            <TouchableOpacity onPress={onClose} className="p-2 -mr-2 bg-[#6C63FF]/10 rounded-full">
+              <X size={16} color="#6C63FF" />
+            </TouchableOpacity>
+          </View>
+
+          {loading ? (
+            <View className="py-10 items-center justify-center">
+              <ActivityIndicator size="large" color="#6C63FF" />
+            </View>
+          ) : requests.length === 0 ? (
+            <View className="py-10 items-center justify-center">
+              <UserCheck size={40} color={isDark ? "#2C2C2E" : "#E5E7EB"} />
+              <Text className="text-sm mt-4 text-center" style={{ color: colors.textSecondary }}>No pending requests.</Text>
+            </View>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} className="max-h-[60vh]">
+              {requests.map((req) => {
+                const profile = Array.isArray(req.profiles) ? req.profiles[0] : req.profiles;
+                return (
+                  <View key={req.id} className={`flex-row items-center p-3 mb-3 rounded-2xl border ${isDark ? "border-[#2C2C2E]" : "border-gray-100"}`}>
+                    <View className="w-12 h-12 rounded-full overflow-hidden mr-3 bg-gray-200">
+                      {profile?.avatar_url ? (
+                        <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
+                      ) : (
+                        <View className="w-full h-full items-center justify-center bg-[#6C63FF]/20">
+                          <Text className="text-[#6C63FF] font-bold text-lg">{profile?.full_name?.charAt(0) || "?"}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-bold text-base" style={{ color: colors.text }} numberOfLines={1}>{profile?.full_name}</Text>
+                      <Text className="text-xs" style={{ color: colors.textSecondary }} numberOfLines={1}>@{profile?.username}</Text>
+                    </View>
+                    <View className="flex-row gap-2">
+                       <TouchableOpacity 
+                         onPress={() => handleAction(req.id, req.user_id, "reject")}
+                         disabled={processingId === req.id}
+                         className={`w-10 h-10 items-center justify-center rounded-full bg-gray-100 ${isDark ? "bg-[#2C2C2E]" : ""}`}
+                       >
+                         <XCircle size={20} color={colors.textSecondary} />
+                       </TouchableOpacity>
+                       <TouchableOpacity 
+                         onPress={() => handleAction(req.id, req.user_id, "approve")}
+                         disabled={processingId === req.id}
+                         className="w-10 h-10 items-center justify-center rounded-full bg-[#6C63FF]/15"
+                       >
+                         {processingId === req.id ? <ActivityIndicator size="small" color="#6C63FF" /> : <CheckCircle size={20} color="#6C63FF" />}
+                       </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 interface NicheData {
   id: string;
@@ -21,6 +189,9 @@ interface NicheData {
   description: string;
   banner_url: string | null;
   isMember: boolean;
+  hasPendingRequest?: boolean;
+  pendingCount?: number;
+  membersCount?: number;
 }
 
 export default function NicheDetailsScreen() {
@@ -39,6 +210,7 @@ export default function NicheDetailsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [joining, setJoining] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [showRequests, setShowRequests] = useState(false);
 
   const isAdminOrMod = profile?.role === "admin" || profile?.role === "mod";
 
@@ -58,9 +230,38 @@ export default function NicheDetailsScreen() {
         .select("*")
         .eq("niche_id", id)
         .eq("user_id", profile.id)
-        .single();
+        .maybeSingle();
 
-      setNiche({ ...nicheData, isMember: !!membership });
+      const { data: request } = await supabase
+        .from("niche_join_requests")
+        .select("*")
+        .eq("niche_id", id)
+        .eq("user_id", profile.id)
+        .eq("status", "pending")
+        .maybeSingle();
+
+      const { count: membersCount } = await supabase
+        .from("niche_memberships")
+        .select("*", { count: 'exact', head: true })
+        .eq("niche_id", id);
+
+      let pendingCount = 0;
+      if (profile.role === "admin" || profile.role === "mod") {
+        const { count } = await supabase
+           .from("niche_join_requests")
+           .select("*", { count: 'exact', head: true })
+           .eq("niche_id", id)
+           .eq("status", "pending");
+        pendingCount = count || 0;
+      }
+
+      setNiche({ 
+        ...nicheData, 
+        isMember: !!membership,
+        hasPendingRequest: !!request,
+        pendingCount: pendingCount,
+        membersCount: membersCount || 0
+      });
 
       // Fetch normal (non-announcement) posts
       const { data: normalPosts } = await supabase
@@ -148,10 +349,17 @@ export default function NicheDetailsScreen() {
 
         setNiche({ ...niche, isMember: false });
       } else {
-        await supabase
-          .from("niche_memberships")
-          .insert({ niche_id: niche.id, user_id: profile.id });
-        setNiche({ ...niche, isMember: true });
+        if (isAdminOrMod) {
+          await supabase
+            .from("niche_memberships")
+            .insert({ niche_id: niche.id, user_id: profile.id });
+          setNiche({ ...niche, isMember: true });
+        } else {
+          await supabase
+            .from("niche_join_requests")
+            .insert({ niche_id: niche.id, user_id: profile.id });
+          setNiche({ ...niche, hasPendingRequest: true });
+        }
       }
     } finally {
       setJoining(false);
@@ -284,6 +492,17 @@ export default function NicheDetailsScreen() {
           <ArrowLeft size={20} color="#FFF" />
         </TouchableOpacity>
 
+        {/* Requests Badge Admin Only */}
+        {isAdminOrMod && niche?.pendingCount !== undefined && niche.pendingCount > 0 && (
+          <TouchableOpacity
+            onPress={() => setShowRequests(true)}
+            className="absolute top-3 right-14 flex-row items-center bg-red-500 pl-2 pr-3 py-1.5 rounded-full z-20"
+          >
+            <Users size={14} color="#FFF" />
+            <Text className="text-white text-xs font-bold ml-1.5">{niche.pendingCount}</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Camera upload for admins/mods */}
         {isAdminOrMod && (
           <TouchableOpacity
@@ -306,24 +525,43 @@ export default function NicheDetailsScreen() {
           <Text className="text-lg font-bold" style={{ color: colors.text }} numberOfLines={1}>
             {niche?.name}
           </Text>
-          <Text className="text-xs" style={{ color: colors.textSecondary }} numberOfLines={1}>
+          <Text className="text-xs mb-1" style={{ color: colors.textSecondary }} numberOfLines={1}>
             {niche?.description}
           </Text>
+          {niche?.membersCount !== undefined && (
+            <View className="flex-row items-center">
+              <Users size={12} color={colors.textSecondary} style={{ opacity: 0.7 }} />
+              <Text className="text-[10px] font-bold ml-1" style={{ color: colors.textSecondary, opacity: 0.7 }}>
+                {niche.membersCount} {niche.membersCount === 1 ? 'Member' : 'Members'}
+              </Text>
+            </View>
+          )}
         </View>
 
-        <TouchableOpacity
-          onPress={handleToggleMembership}
-          disabled={joining}
-          className={`px-4 py-2 rounded-full border ${niche?.isMember ? (isDark ? "border-[#2C2C2E]" : "border-gray-200") : "border-[#6C63FF] bg-[#6C63FF]"}`}
-        >
-          {joining ? (
-            <ActivityIndicator size="small" color={niche?.isMember ? colors.text : "#FFF"} />
-          ) : (
-            <Text className={`font-bold text-sm ${niche?.isMember ? "" : "text-white"}`} style={niche?.isMember ? { color: colors.textSecondary } : {}}>
-              {niche?.isMember ? "Joined" : "Join"}
+        {niche?.hasPendingRequest && !niche?.isMember ? (
+          <TouchableOpacity
+            disabled={true}
+            className={`px-4 py-2 rounded-full border ${isDark ? "border-[#2C2C2E]" : "border-gray-200"}`}
+          >
+            <Text className="font-bold text-sm" style={{ color: colors.textSecondary }}>
+              Request Sent
             </Text>
-          )}
-        </TouchableOpacity>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={handleToggleMembership}
+            disabled={joining}
+            className={`px-4 py-2 rounded-full border ${niche?.isMember ? (isDark ? "border-[#2C2C2E]" : "border-gray-200") : "border-[#6C63FF] bg-[#6C63FF]"}`}
+          >
+            {joining ? (
+              <ActivityIndicator size="small" color={niche?.isMember ? colors.text : "#FFF"} />
+            ) : (
+              <Text className={`font-bold text-sm ${niche?.isMember ? "" : "text-white"}`} style={niche?.isMember ? { color: colors.textSecondary } : {}}>
+                {niche?.isMember ? "Joined" : "Join"}
+              </Text>
+            )}
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ── Tabs ── */}
@@ -432,6 +670,15 @@ export default function NicheDetailsScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <RequestsModal
+        visible={showRequests}
+        onClose={() => setShowRequests(false)}
+        nicheId={niche?.id || null}
+        isDark={isDark}
+        colors={colors}
+        onActionComplete={fetchNicheData}
+      />
     </SafeAreaView>
   );
 }

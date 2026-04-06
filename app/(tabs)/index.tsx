@@ -24,10 +24,20 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [supportDot, setSupportDot] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Check for unread support activity
-  const checkSupportDot = useCallback(async () => {
+  // Check for unread support activity & notifications
+  const checkUnreadActivity = useCallback(async () => {
     if (!profile?.id) return;
+    
+    // Check notifications
+    const { count: notifCount } = await supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", profile.id)
+      .eq("read", false);
+    setUnreadCount(notifCount ?? 0);
+
     const isStaff = profile.role === "admin" || profile.role === "mod";
     if (isStaff) {
       // Admin/mod: any open ticket means action needed
@@ -47,7 +57,7 @@ export default function HomeScreen() {
     }
   }, [profile?.id, profile?.role]);
 
-  useFocusEffect(useCallback(() => { checkSupportDot(); }, [checkSupportDot]));
+  useFocusEffect(useCallback(() => { checkUnreadActivity(); }, [checkUnreadActivity]));
 
   const fetchPosts = async () => {
     try {
@@ -135,8 +145,13 @@ export default function HomeScreen() {
         />
         <View className="flex-row items-center">
           <Link href="/notifications" asChild>
-            <TouchableOpacity className="p-2 mr-2">
+            <TouchableOpacity className="p-2 mr-2 relative">
               <Bell size={24} color={colors.text} />
+              {unreadCount > 0 && (
+                <View className="absolute top-1 right-2 w-4 h-4 bg-red-500 rounded-full items-center justify-center border-2 border-white dark:border-[#1C1C1E]">
+                  <Text className="text-[8px] font-bold text-white text-center w-full">{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </Link>
           <Link href="/support" asChild>

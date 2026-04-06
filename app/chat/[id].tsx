@@ -442,11 +442,34 @@ export default function ChatRoomScreen() {
   };
 
   // ─── Message renderer ───────────────────────────────────────────────────
-  const renderMessage = ({ item }: { item: Message }) => {
-    const isMe = item.sender_id === profile?.id;
+  const renderMessageDateSeparator = (dateString: string) => {
+    const d = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let displayStr = "";
+    if (d.toDateString() === today.toDateString()) displayStr = "Today";
+    else if (d.toDateString() === yesterday.toDateString()) displayStr = "Yesterday";
+    else displayStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
     return (
-      <View className={`flex-row mb-4 ${isMe ? "justify-end" : "justify-start"}`}>
+      <View className="items-center my-4">
+        <View className={`px-3 py-1 rounded-full ${isDark ? "bg-[#2C2C2E]" : "bg-gray-200"}`}>
+          <Text className="text-xs font-bold" style={{ color: colors.textSecondary }}>{displayStr}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderMessage = ({ item, index }: { item: Message; index: number }) => {
+    const isMe = item.sender_id === profile?.id;
+    const showDateSeparator = index === messages.length - 1 || new Date(item.created_at).toDateString() !== new Date(messages[index + 1].created_at).toDateString();
+
+    return (
+      <View>
+        {showDateSeparator && renderMessageDateSeparator(item.created_at)}
+        <View className={`flex-row mb-4 ${isMe ? "justify-end" : "justify-start"}`}>
         {!isMe && (
           <TouchableOpacity
             onPress={() => item.sender?.id ? router.push(`/profile/${item.sender.id}` as any) : null}
@@ -519,7 +542,14 @@ export default function ChatRoomScreen() {
               </View>
             )}
           </View>
+          <Text 
+            className={`text-[10px] mt-1 mx-1 ${isMe ? "text-right" : "text-left"}`} 
+            style={{ color: colors.textSecondary }}
+          >
+            {new Date(item.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </Text>
         </View>
+      </View>
       </View>
     );
   };

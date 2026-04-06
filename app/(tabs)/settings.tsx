@@ -15,7 +15,7 @@ import {
   Moon,
   Shield
 } from "lucide-react-native";
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Image,
   ScrollView,
@@ -34,6 +34,26 @@ export default function SettingsScreen() {
   const isDark = theme === "dark";
 
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+
+  useEffect(() => {
+    if (profile?.id) {
+      supabase
+        .from('profiles')
+        .select('push_enabled')
+        .eq('id', profile.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setPushEnabled(data.push_enabled || false);
+        });
+    }
+  }, [profile?.id]);
+
+  const togglePushNotifications = async (val: boolean) => {
+    if (!profile?.id) return;
+    setPushEnabled(val);
+    await supabase.from('profiles').update({ push_enabled: val }).eq('id', profile.id);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -157,7 +177,7 @@ export default function SettingsScreen() {
         <OptionRow
           icon={Shield}
           title="Privacy & Security"
-          onPress={() => {}}
+          onPress={() => router.push('/settings/privacy-security')}
         />
 
         {/* Preferences */}
@@ -169,8 +189,19 @@ export default function SettingsScreen() {
         </Text>
         <OptionRow
           icon={Bell}
-          title="Notifications"
+          title="In-App Notifications"
           onPress={() => router.push("/notifications")}
+        />
+        <OptionRow
+          icon={Bell}
+          title="Push Notifications"
+          rightElement={
+            <Switch
+              value={pushEnabled}
+              onValueChange={togglePushNotifications}
+              trackColor={{ false: "#767577", true: "#6C63FF" }}
+            />
+          }
         />
         <OptionRow
           icon={Moon}
@@ -199,9 +230,13 @@ export default function SettingsScreen() {
         <OptionRow
           icon={FileText}
           title="Terms of Service"
-          onPress={() => {}}
+          onPress={() => router.push('/legal/terms')}
         />
-        <OptionRow icon={Info} title="Privacy Policy" onPress={() => {}} />
+        <OptionRow 
+          icon={Info} 
+          title="Privacy Policy" 
+          onPress={() => router.push('/legal/privacy')} 
+        />
 
         {/* Log Out */}
         <TouchableOpacity

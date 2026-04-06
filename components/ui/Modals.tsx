@@ -129,3 +129,45 @@ export function ConfirmModal({
     </Modal>
   );
 }
+
+export interface AlertModalProps {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  description: string;
+  buttonText?: string;
+  type?: "success" | "error" | "info";
+}
+
+export function AlertModal({
+  visible,
+  onClose,
+  title,
+  description,
+  buttonText = "OK",
+  type = "info",
+}: AlertModalProps) {
+  const { theme } = useThemeStore();
+  const colors = theme === "dark" ? Colors.dark : Colors.light;
+  const isDark = theme === "dark";
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View className="flex-1 bg-black/60 items-center justify-center p-5">
+        <View className={`w-full p-6 rounded-3xl ${isDark ? "bg-[#1C1C1E]" : "bg-white"}`}>
+          <Text className={`text-2xl font-bold mb-2 ${type === 'error' ? 'text-red-500' : type === 'success' ? 'text-green-500' : ''}`} style={type === 'info' ? { color: colors.text } : {}}>
+            {title}
+          </Text>
+          <Text className="text-base mb-6 leading-6" style={{ color: colors.textSecondary }}>{description}</Text>
+          
+          <Button 
+            title={buttonText} 
+            variant="primary" 
+            onPress={onClose} 
+            className={type === 'error' ? "bg-red-500" : type === 'success' ? "bg-green-500" : ""}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
+}
