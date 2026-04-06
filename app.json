@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Cryptonians",
-    "slug": "Cryptonians",
+    "slug": "cryptonians",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo_black.png",
@@ -38,6 +38,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "325a2d31-2e03-428d-8d8b-fcb23d371c9d"
+      }
     }
   }
 }
