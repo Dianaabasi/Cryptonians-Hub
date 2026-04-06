@@ -137,8 +137,8 @@ export default function HomeScreen() {
         <Image
           source={
             isDark
-              ? require("@/assets/images/logo-white.png")
-              : require("@/assets/images/logo-black.png")
+              ? require("@/assets/images/logo_white.png")
+              : require("@/assets/images/logo_black.png")
           }
           className="w-20 h-20 -ml-2"
           resizeMode="contain"

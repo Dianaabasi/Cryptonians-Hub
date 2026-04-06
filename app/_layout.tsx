@@ -70,7 +70,7 @@ export default function RootLayout() {
         }}
       >
         <Image
-          source={require("../assets/images/logo-white.png")}
+          source={require("../assets/images/logo_white.png")}
           style={{ width: LOGO_SIZE, height: LOGO_SIZE }}
           resizeMode="contain"
         />

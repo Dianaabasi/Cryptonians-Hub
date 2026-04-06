@@ -79,7 +79,7 @@ export default function LoginScreen() {
           {/* Large centered logo */}
           <View className="items-center mb-10">
             <Image
-              source={require("@/assets/images/logo-white.png")}
+              source={require("@/assets/images/logo_white.png")}
               style={{ width: LOGO_SIZE, height: LOGO_SIZE }}
               resizeMode="contain"
             />

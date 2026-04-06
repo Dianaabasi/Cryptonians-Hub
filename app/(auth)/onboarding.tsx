@@ -22,9 +22,9 @@ import { ONBOARDING_SLIDES } from "@/constants/Onboarding";
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const ILLUSTRATIONS = [
-  require("@/assets/images/onboarding-1.png"),
-  require("@/assets/images/onboarding-2.png"),
-  require("@/assets/images/onboarding-3.png"),
+  require("@/assets/images/onboarding_1.png"),
+  require("@/assets/images/onboarding_2.png"),
+  require("@/assets/images/onboarding_3.png"),
 ];
 
 function PaginationDot({ index, scrollX }: { index: number; scrollX: SharedValue<number> }) {

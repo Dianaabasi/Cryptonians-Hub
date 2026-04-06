@@ -4,21 +4,23 @@
     "slug": "Cryptonians",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo-black.png",
+    "icon": "./assets/images/logo_black.png",
     "scheme": "cryptonians",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/logo-white.png",
+      "image": "./assets/images/logo_white.png",
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0A"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cryptonians.app"
     },
     "android": {
+      "package": "com.cryptonians.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo-black.png",
+        "foregroundImage": "./assets/images/logo_black.png",
         "backgroundColor": "#FFFFFF"
       },
       "edgeToEdgeEnabled": true,
@@ -28,7 +30,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/logo-black.png"
+      "favicon": "./assets/images/logo_black.png"
     },
     "plugins": [
       "expo-router",
