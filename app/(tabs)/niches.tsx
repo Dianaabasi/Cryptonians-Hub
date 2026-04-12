@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Image, Modal, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image, Modal, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { Colors } from "@/constants/Colors";
@@ -35,6 +36,7 @@ function CreateNicheModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const { showModal, modalProps: createModalProps } = useAppModal();
 
   const reset = () => {
     setName("");
@@ -43,7 +45,7 @@ function CreateNicheModal({
 
   const handleSubmit = async () => {
     if (!name.trim() || !description.trim()) {
-      Alert.alert("Required", "Please fill in both name and description.");
+      showModal({ title: "Required", message: "Please fill in both name and description.", variant: "warning" });
       return;
     }
     setLoading(true);
@@ -62,7 +64,7 @@ function CreateNicheModal({
       onCreated();
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Could not create niche.");
+      showModal({ title: "Error", message: "Could not create niche.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -133,6 +135,7 @@ function RequestsModal({
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const { showModal: showReqModal, modalProps: reqModalProps } = useAppModal();
 
   useEffect(() => {
     if (visible && nicheId) {
@@ -158,7 +161,7 @@ function RequestsModal({
       setRequests(data || []);
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Could not load requests.");
+      showReqModal({ title: "Error", message: "Could not load requests.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -208,78 +211,81 @@ function RequestsModal({
       }
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", `Could not ${action} request.`);
+      showReqModal({ title: "Error", message: `Could not ${action} request.`, variant: "error" });
     } finally {
       setProcessingId(null);
     }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View className="flex-1 justify-end bg-black/50">
-        <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onClose} />
-        <View className="rounded-t-3xl p-6 min-h-[50%]" style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFF", paddingBottom: Platform.OS === "ios" ? 40 : 24 }}>
-          <View className="w-10 h-1 rounded-full bg-gray-400/40 self-center mb-6" />
-          
-          <View className="flex-row justify-between items-center mb-6">
-            <Text className="text-xl font-bold" style={{ color: colors.text }}>Join Requests</Text>
-            <TouchableOpacity onPress={onClose} className="p-2 -mr-2 bg-[#6C63FF]/10 rounded-full">
-              <X size={16} color="#6C63FF" />
-            </TouchableOpacity>
-          </View>
+    <>
+      <Modal visible={visible} animationType="slide" transparent>
+        <View className="flex-1 justify-end bg-black/50">
+          <TouchableOpacity className="flex-1" activeOpacity={1} onPress={onClose} />
+          <View className="rounded-t-3xl p-6 min-h-[50%]" style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFF", paddingBottom: Platform.OS === "ios" ? 40 : 24 }}>
+            <View className="w-10 h-1 rounded-full bg-gray-400/40 self-center mb-6" />
+            
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-xl font-bold" style={{ color: colors.text }}>Join Requests</Text>
+              <TouchableOpacity onPress={onClose} className="p-2 -mr-2 bg-[#6C63FF]/10 rounded-full">
+                <X size={16} color="#6C63FF" />
+              </TouchableOpacity>
+            </View>
 
-          {loading ? (
-            <View className="py-10 items-center justify-center">
-              <ActivityIndicator size="large" color="#6C63FF" />
-            </View>
-          ) : requests.length === 0 ? (
-            <View className="py-10 items-center justify-center">
-              <UserCheck size={40} color={isDark ? "#2C2C2E" : "#E5E7EB"} />
-              <Text className="text-sm mt-4 text-center" style={{ color: colors.textSecondary }}>No pending requests.</Text>
-            </View>
-          ) : (
-            <ScrollView showsVerticalScrollIndicator={false} className="max-h-[60vh]">
-              {requests.map((req) => {
-                const profile = Array.isArray(req.profiles) ? req.profiles[0] : req.profiles;
-                return (
-                  <View key={req.id} className={`flex-row items-center p-3 mb-3 rounded-2xl border ${isDark ? "border-[#2C2C2E]" : "border-gray-100"}`}>
-                    <View className="w-12 h-12 rounded-full overflow-hidden mr-3 bg-gray-200">
-                      {profile?.avatar_url ? (
-                        <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
-                      ) : (
-                        <View className="w-full h-full items-center justify-center bg-[#6C63FF]/20">
-                          <Text className="text-[#6C63FF] font-bold text-lg">{profile?.full_name?.charAt(0) || "?"}</Text>
-                        </View>
-                      )}
+            {loading ? (
+              <View className="py-10 items-center justify-center">
+                <ActivityIndicator size="large" color="#6C63FF" />
+              </View>
+            ) : requests.length === 0 ? (
+              <View className="py-10 items-center justify-center">
+                <UserCheck size={40} color={isDark ? "#2C2C2E" : "#E5E7EB"} />
+                <Text className="text-sm mt-4 text-center" style={{ color: colors.textSecondary }}>No pending requests.</Text>
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false} className="max-h-[60vh]">
+                {requests.map((req) => {
+                  const profile = Array.isArray(req.profiles) ? req.profiles[0] : req.profiles;
+                  return (
+                    <View key={req.id} className={`flex-row items-center p-3 mb-3 rounded-2xl border ${isDark ? "border-[#2C2C2E]" : "border-gray-100"}`}>
+                      <View className="w-12 h-12 rounded-full overflow-hidden mr-3 bg-gray-200">
+                        {profile?.avatar_url ? (
+                          <Image source={{ uri: profile.avatar_url }} className="w-full h-full" />
+                        ) : (
+                          <View className="w-full h-full items-center justify-center bg-[#6C63FF]/20">
+                            <Text className="text-[#6C63FF] font-bold text-lg">{profile?.full_name?.charAt(0) || "?"}</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View className="flex-1">
+                        <Text className="font-bold text-base" style={{ color: colors.text }} numberOfLines={1}>{profile?.full_name}</Text>
+                        <Text className="text-xs" style={{ color: colors.textSecondary }} numberOfLines={1}>@{profile?.username}</Text>
+                      </View>
+                      <View className="flex-row gap-2">
+                         <TouchableOpacity 
+                           onPress={() => handleAction(req.id, req.user_id, "reject")}
+                           disabled={processingId === req.id}
+                           className={`w-10 h-10 items-center justify-center rounded-full bg-gray-100 ${isDark ? "bg-[#2C2C2E]" : ""}`}
+                         >
+                           <XCircle size={20} color={colors.textSecondary} />
+                         </TouchableOpacity>
+                         <TouchableOpacity 
+                           onPress={() => handleAction(req.id, req.user_id, "approve")}
+                           disabled={processingId === req.id}
+                           className="w-10 h-10 items-center justify-center rounded-full bg-[#6C63FF]/15"
+                         >
+                           {processingId === req.id ? <ActivityIndicator size="small" color="#6C63FF" /> : <CheckCircle size={20} color="#6C63FF" />}
+                         </TouchableOpacity>
+                      </View>
                     </View>
-                    <View className="flex-1">
-                      <Text className="font-bold text-base" style={{ color: colors.text }} numberOfLines={1}>{profile?.full_name}</Text>
-                      <Text className="text-xs" style={{ color: colors.textSecondary }} numberOfLines={1}>@{profile?.username}</Text>
-                    </View>
-                    <View className="flex-row gap-2">
-                       <TouchableOpacity 
-                         onPress={() => handleAction(req.id, req.user_id, "reject")}
-                         disabled={processingId === req.id}
-                         className={`w-10 h-10 items-center justify-center rounded-full bg-gray-100 ${isDark ? "bg-[#2C2C2E]" : ""}`}
-                       >
-                         <XCircle size={20} color={colors.textSecondary} />
-                       </TouchableOpacity>
-                       <TouchableOpacity 
-                         onPress={() => handleAction(req.id, req.user_id, "approve")}
-                         disabled={processingId === req.id}
-                         className="w-10 h-10 items-center justify-center rounded-full bg-[#6C63FF]/15"
-                       >
-                         {processingId === req.id ? <ActivityIndicator size="small" color="#6C63FF" /> : <CheckCircle size={20} color="#6C63FF" />}
-                       </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-          )}
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      <AppModal {...reqModalProps} />
+    </>
   );
 }
 
@@ -300,6 +306,7 @@ export default function NichesScreen() {
   const [nicheToDelete, setNicheToDelete] = useState<Niche | null>(null);
   const [isDeletingNiche, setIsDeletingNiche] = useState(false);
   const [requestsNiche, setRequestsNiche] = useState<Niche | null>(null);
+  const { showModal, modalProps } = useAppModal();
 
   const isSuperAdmin = profile?.role === "admin";
   const isAdmin = profile?.role === "admin" || profile?.role === "mod";
@@ -359,7 +366,11 @@ export default function NichesScreen() {
     }
   };
 
-  useEffect(() => { fetchNichesInfo(); }, [profile?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchNichesInfo();
+    }, [profile?.id])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -386,7 +397,7 @@ export default function NichesScreen() {
         setNiches((prev) => prev.map((n) => n.id === nicheId ? { ...n, hasPendingRequest: true } : n));
       }
     } catch {
-      Alert.alert("Error", "Could not send join request.");
+      showModal({ title: "Error", message: "Could not send join request.", variant: "error" });
     } finally {
       setJoiningId(null);
     }
@@ -419,7 +430,7 @@ export default function NichesScreen() {
 
       setNiches((prev) => prev.map((n) => n.id === nicheId ? { ...n, isMember: false } : n));
     } catch {
-      Alert.alert("Error", "Could not leave the niche.");
+      showModal({ title: "Error", message: "Could not leave the niche.", variant: "error" });
     } finally {
       setJoiningId(null);
     }
@@ -440,7 +451,7 @@ export default function NichesScreen() {
       setNicheToDelete(null);
     } catch (error) {
       console.error("Delete Niche Error:", error);
-      Alert.alert("Error", "Could not delete niche.");
+      showModal({ title: "Error", message: "Could not delete niche.", variant: "error" });
     } finally {
       setIsDeletingNiche(false);
     }
@@ -724,6 +735,7 @@ export default function NichesScreen() {
           <View className="h-32" />
         </ScrollView>
       )}
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

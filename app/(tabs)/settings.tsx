@@ -1,10 +1,14 @@
+import { ConfirmModal } from "@/components/ui/Modals";
 import { Colors } from "@/constants/Colors";
+import {
+  registerForPushNotificationsAsync,
+  savePushTokenToProfile,
+} from "@/lib/pushNotifications";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
-import { ConfirmModal } from "@/components/ui/Modals";
 import Constants from "expo-constants";
-import { useRouter, useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Bell,
   ChevronRight,
@@ -13,9 +17,9 @@ import {
   Info,
   LogOut,
   Moon,
-  Shield
+  Shield,
 } from "lucide-react-native";
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Image,
   ScrollView,
@@ -39,9 +43,9 @@ export default function SettingsScreen() {
   useEffect(() => {
     if (profile?.id) {
       supabase
-        .from('profiles')
-        .select('push_enabled')
-        .eq('id', profile.id)
+        .from("profiles")
+        .select("push_enabled")
+        .eq("id", profile.id)
         .single()
         .then(({ data }) => {
           if (data) setPushEnabled(data.push_enabled || false);
@@ -52,7 +56,18 @@ export default function SettingsScreen() {
   const togglePushNotifications = async (val: boolean) => {
     if (!profile?.id) return;
     setPushEnabled(val);
-    await supabase.from('profiles').update({ push_enabled: val }).eq('id', profile.id);
+
+    // If enabling, ensure we have the token and permissions
+    if (val) {
+      registerForPushNotificationsAsync().then((token) => {
+        if (token) savePushTokenToProfile(profile.id, token);
+      });
+    }
+
+    await supabase
+      .from("profiles")
+      .update({ push_enabled: val })
+      .eq("id", profile.id);
   };
 
   const handleLogout = async () => {
@@ -85,8 +100,11 @@ export default function SettingsScreen() {
     }
   }, [profile?.id, profile?.role]);
 
-  useFocusEffect(useCallback(() => { checkSupportDot(); }, [checkSupportDot]));
-
+  useFocusEffect(
+    useCallback(() => {
+      checkSupportDot();
+    }, [checkSupportDot]),
+  );
 
   const OptionRow = ({ icon: Icon, title, onPress, rightElement }: any) => (
     <TouchableOpacity
@@ -118,7 +136,8 @@ export default function SettingsScreen() {
       style={{ backgroundColor: colors.background }}
     >
       <ScrollView
-        className="flex-1 px-5 pt-4 pb-32"
+        className="flex-1 px-5 pt-4"
+        contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
         <Text
@@ -177,7 +196,7 @@ export default function SettingsScreen() {
         <OptionRow
           icon={Shield}
           title="Privacy & Security"
-          onPress={() => router.push('/settings/privacy-security')}
+          onPress={() => router.push("/settings/privacy-security")}
         />
 
         {/* Preferences */}
@@ -230,12 +249,12 @@ export default function SettingsScreen() {
         <OptionRow
           icon={FileText}
           title="Terms of Service"
-          onPress={() => router.push('/legal/terms')}
+          onPress={() => router.push("/legal/terms")}
         />
-        <OptionRow 
-          icon={Info} 
-          title="Privacy Policy" 
-          onPress={() => router.push('/legal/privacy')} 
+        <OptionRow
+          icon={Info}
+          title="Privacy Policy"
+          onPress={() => router.push("/legal/privacy")}
         />
 
         {/* Log Out */}
@@ -248,12 +267,12 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         {/* App Version */}
-        <View className="items-center mt-8 pb-10">
+        <View className="items-center mt-12 pb-6">
           <Text
-            className="text-xs font-medium"
+            className="text-sm font-bold"
             style={{ color: colors.textSecondary }}
           >
-            Cryptonians v{Constants.expoConfig?.version || "1.0.0"}
+            Cryptonians hub v{Constants.expoConfig?.version || "1.1.0"}
           </Text>
         </View>
       </ScrollView>

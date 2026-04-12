@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Image } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -18,6 +19,7 @@ export default function EditProfileScreen() {
   const isDark = theme === "dark";
 
   const [loading, setLoading] = useState(false);
+  const { showModal, modalProps } = useAppModal();
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [bio, setBio] = useState(profile?.bio || "");
   const [xUsername, setXUsername] = useState(profile?.x_username || "");
@@ -68,7 +70,7 @@ export default function EditProfileScreen() {
           .upload(filename, decode(imageBase64), { contentType: `image/${ext}` });
           
         if (uploadError) {
-          Alert.alert("Avatar Error", "Could not upload profile picture. Did you create the 'avatars' public bucket?");
+          showModal({ title: "Avatar Error", message: "Could not upload profile picture. Did you create the 'avatars' public bucket?", variant: "error" });
           console.error(uploadError);
         } else if (uploadData) {
           const { data: publicUrlData } = supabase.storage.from('avatars').getPublicUrl(filename);
@@ -99,7 +101,7 @@ export default function EditProfileScreen() {
         router.back();
       }
     } catch (err) {
-      Alert.alert("Error", "Could not save profile details.");
+      showModal({ title: "Error", message: "Could not save profile details.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -220,6 +222,7 @@ export default function EditProfileScreen() {
           <View className="h-10" />
         </ScrollView>
       </KeyboardAvoidingView>
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

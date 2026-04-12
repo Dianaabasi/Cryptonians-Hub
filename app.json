@@ -2,7 +2,7 @@
   "expo": {
     "name": "Cryptonians",
     "slug": "cryptonians",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo_black.png",
     "scheme": "cryptonians",
@@ -15,10 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cryptonians.app"
+      "bundleIdentifier": "com.cryptonians.app",
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.cryptonians.app",
+      "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo_black.png",
         "backgroundColor": "#FFFFFF"

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, Image, FlatList, TouchableOpacity,
-  ActivityIndicator, Alert, Modal, ScrollView
+  ActivityIndicator, Modal, ScrollView
 } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -47,6 +48,7 @@ export default function ProfileScreen() {
   // Role management modal
   const [roleModalVisible, setRoleModalVisible] = useState(false);
   const [updatingRole, setUpdatingRole] = useState(false);
+  const { showModal, modalProps } = useAppModal();
 
   const isOwnProfile = currentUserProfile?.id === id;
   const isCurrentUserAdmin = currentUserProfile?.role === "admin";
@@ -74,14 +76,23 @@ export default function ProfileScreen() {
     try {
       setLoading(true);
 
+      let targetId = id;
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
       // Fetch profile (for other users)
       if (!isOwnProfile) {
-        const { data: pData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", id)
-          .single();
-        if (pData) setProfile(pData);
+        let query = supabase.from("profiles").select("*");
+        if (isUUID) query = query.eq("id", id);
+        else query = query.eq("username", id);
+
+        const { data: pData } = await query.single();
+        if (pData) {
+          setProfile(pData);
+          targetId = pData.id;
+        } else {
+          setLoading(false);
+          return;
+        }
       }
 
       // Fetch posts
@@ -93,7 +104,7 @@ export default function ProfileScreen() {
           likes:likes(count),
           comments:comments(count)
         `)
-        .eq("author_id", id)
+        .eq("author_id", targetId)
         .order("created_at", { ascending: false });
 
       if (postsData) {
@@ -112,7 +123,7 @@ export default function ProfileScreen() {
           niche_id,
           niches(id, name, description, banner_url)
         `)
-        .eq("user_id", id);
+        .eq("user_id", targetId);
 
       if (nichesData) {
         setJoinedNiches(nichesData.map((m: any) => ({
@@ -127,7 +138,7 @@ export default function ProfileScreen() {
 
   const copyToClipboard = async (text: string, label: string) => {
     await Clipboard.setStringAsync(text);
-    Alert.alert(`Copied ${label}`, `${text} copied to clipboard!`);
+    showModal({ title: `${label} Copied`, message: `${text} copied to clipboard!`, variant: "success" });
   };
 
   const handleMessageUser = async () => {
@@ -142,7 +153,7 @@ export default function ProfileScreen() {
       router.push(`/chat/${chatId}` as any);
     } catch (e: any) {
       console.error(e);
-      Alert.alert("Error", e?.message || "Could not start chat.");
+      showModal({ title: "Error", message: e?.message || "Could not start chat.", variant: "error" });
     } finally {
       setStartingChat(false);
     }
@@ -160,9 +171,9 @@ export default function ProfileScreen() {
       if (error) throw error;
       setProfile({ ...profile, role: newRole });
       setRoleModalVisible(false);
-      Alert.alert("Role Updated", `${profile.full_name} is now a ${newRole}.`);
+      showModal({ title: "Role Updated", message: `${profile.full_name} is now a ${newRole}.`, variant: "success" });
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Could not update role.");
+      showModal({ title: "Error", message: e.message || "Could not update role.", variant: "error" });
     } finally {
       setUpdatingRole(false);
     }
@@ -527,6 +538,7 @@ export default function ProfileScreen() {
       )}
 
       {renderRoleModal()}
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

@@ -35,10 +35,13 @@ export interface PostType {
 interface PostCardProps {
   post: PostType;
   onDelete?: (id: string) => void;
+  onReport?: (id: string) => void;
   hideCommentLink?: boolean;
+  onImagePress?: (url: string) => void;
+  onLikesPress?: () => void;
 }
 
-export function PostCard({ post, onDelete, hideCommentLink = false }: PostCardProps) {
+export function PostCard({ post, onDelete, onReport, hideCommentLink = false, onImagePress, onLikesPress }: PostCardProps) {
   const router = useRouter();
   const { theme } = useThemeStore();
   const { profile } = useAuthStore();
@@ -99,6 +102,12 @@ export function PostCard({ post, onDelete, hideCommentLink = false }: PostCardPr
     if (onDelete) onDelete(post.id);
   };
 
+  const confirmReport = async () => {
+    if (!profile?.id) return;
+    await supabase.from("reported_posts").insert({ post_id: post.id, user_id: profile.id });
+    if (onReport) onReport(post.id);
+  };
+
   const getRelativeTime = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -110,19 +119,34 @@ export function PostCard({ post, onDelete, hideCommentLink = false }: PostCardPr
     return `${Math.floor(diffInSeconds / 86400)}d`;
   };
 
-  const renderContentWithLinks = (text: string) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = text.split(urlRegex);
+  const renderContentWithMentions = (text: string) => {
+    const regex = /(https?:\/\/[^\s]+|@[a-zA-Z0-9_]+)/g;
+    const parts = text.split(regex);
 
     return parts.map((part, index) => {
-      if (part.match(urlRegex)) {
+      if (part.match(/^https?:\/\/[^\s]+/)) {
         return (
           <Text 
             key={index} 
             style={{ color: "#6C63FF", textDecorationLine: "underline" }}
             onPress={(e) => {
-              e.stopPropagation(); // Try to prevent card click
+              e.stopPropagation();
               Linking.openURL(part).catch(() => {});
+            }}
+          >
+            {part}
+          </Text>
+        );
+      }
+      if (part.match(/^@[a-zA-Z0-9_]+/)) {
+        const username = part.slice(1);
+        return (
+          <Text 
+            key={index} 
+            style={{ color: "#6C63FF", fontWeight: "600" }}
+            onPress={(e) => {
+              e.stopPropagation();
+              router.push(`/profile/${username}` as any);
             }}
           >
             {part}
@@ -225,19 +249,27 @@ export function PostCard({ post, onDelete, hideCommentLink = false }: PostCardPr
           )}
 
           {/* Content */}
-          <Text 
-            className={`text-base leading-6 mb-3 ${isJob ? "font-medium" : ""}`} 
-          >
-            {renderContentWithLinks(post.content)}
-          </Text>
+          {post.content ? (
+            <Text 
+              className={`text-base leading-6 mb-3 ${isJob ? "font-medium" : ""}`} 
+            >
+              {renderContentWithMentions(post.content.trim())}
+            </Text>
+          ) : null}
           
           {/* Image OR Link Preview */}
           {post.image_url ? (
-            <Image 
-              source={{ uri: post.image_url }} 
-              className="w-full h-48 rounded-xl mb-4 bg-gray-800"
-              resizeMode="cover"
-            />
+            <TouchableOpacity 
+              activeOpacity={0.9} 
+              onPress={() => onImagePress ? onImagePress(post.image_url as string) : undefined}
+              disabled={!onImagePress}
+            >
+              <Image 
+                source={{ uri: post.image_url }} 
+                className="w-full h-48 rounded-xl mb-4 bg-gray-800"
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
           ) : firstUrl ? (
             <TouchableOpacity 
               activeOpacity={0.9} 
@@ -250,6 +282,16 @@ export function PostCard({ post, onDelete, hideCommentLink = false }: PostCardPr
                 requestTimeout={3000}
                 containerStyle={{ padding: 0 }}
                 textContainerStyle={{ padding: 12 }}
+                renderTitle={(title) => (
+                  <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 4 }} numberOfLines={2}>
+                    {title}
+                  </Text>
+                )}
+                renderDescription={(desc) => (
+                  <Text style={{ color: colors.textSecondary, fontSize: 14 }} numberOfLines={3}>
+                    {desc}
+                  </Text>
+                )}
               />
             </TouchableOpacity>
           ) : null}
@@ -266,12 +308,14 @@ export function PostCard({ post, onDelete, hideCommentLink = false }: PostCardPr
                 color={hasLiked ? "#EF4444" : colors.textSecondary} 
                 fill={hasLiked ? "#EF4444" : "transparent"} 
               />
-              <Text 
-                className={`ml-1.5 font-medium ${hasLiked ? "text-red-500" : ""}`}
-                style={!hasLiked ? { color: colors.textSecondary } : undefined}
-              >
-                {likesCount}
-              </Text>
+              <TouchableOpacity onPress={onLikesPress} disabled={!onLikesPress}>
+                <Text 
+                  className={`ml-1.5 font-medium ${hasLiked ? "text-red-500" : ""}`}
+                  style={!hasLiked ? { color: colors.textSecondary } : undefined}
+                >
+                  {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}
+                </Text>
+              </TouchableOpacity>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -314,9 +358,7 @@ export function PostCard({ post, onDelete, hideCommentLink = false }: PostCardPr
         description="Flag this post for moderator review?"
         confirmText="Report"
         isDestructive={true}
-        onConfirm={() => {
-           // We mimic reports being saved logic
-        }}
+        onConfirm={confirmReport}
       />
     </>
   );

@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Image,
   ScrollView,
 } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -26,6 +26,7 @@ export default function ComposeScreen() {
   const { nicheId, isAnnouncement } = useLocalSearchParams<{ nicheId?: string, isAnnouncement?: string }>();
   const { theme } = useThemeStore();
   const { profile } = useAuthStore();
+  const { showModal, modalProps } = useAppModal();
   const colors = theme === "dark" ? Colors.dark : Colors.light;
   const isDark = theme === "dark";
 
@@ -68,7 +69,7 @@ export default function ComposeScreen() {
           
         if (uploadError) {
           console.error("Upload error:", uploadError);
-          Alert.alert("Error", "Could not upload image. Please ensure the 'posts' storage bucket exists and is public.");
+          showModal({ title: "Upload Error", message: "Could not upload image. Please ensure the 'posts' storage bucket exists and is public.", variant: "error" });
           setLoading(false);
           return;
         }
@@ -80,24 +81,41 @@ export default function ComposeScreen() {
       }
 
       // 2. Insert Post Row
-      const { error } = await supabase.from("posts").insert({
+      const { data: insertedPost, error } = await supabase.from("posts").insert({
         author_id: profile?.id,
         content: content.trim(),
         niche_id: nicheId || null,
         is_job_post: false,
         is_announcement: isAnnouncement === "true",
         image_url: finalImageUrl,
-      });
+      }).select("id").single();
 
       if (error) {
-        Alert.alert("Error posting", error.message);
+        showModal({ title: "Error Posting", message: error.message, variant: "error" });
         return;
+      }
+
+      // 3. Notify Mentions
+      if (insertedPost && profile?.id) {
+        const mentions = content.match(/@([a-zA-Z0-9_]+)/g);
+        if (mentions && mentions.length > 0) {
+          const usernames = mentions.map((m) => m.slice(1));
+          const { error: rpcError } = await supabase.rpc("bulk_notify_mentions", {
+            p_usernames: usernames,
+            p_actor_id: profile.id,
+            p_reference_id: insertedPost.id,
+            p_type: "new_post",
+            p_title: "You were mentioned!",
+            p_message: "Someone tagged you in a post.",
+          });
+          if (rpcError) console.error("Mention notify error:", rpcError);
+        }
       }
 
       router.back();
     } catch (err) {
       console.error(err);
-      Alert.alert("Error", "Something went wrong.");
+      showModal({ title: "Error", message: "Something went wrong.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -173,6 +191,7 @@ export default function ComposeScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

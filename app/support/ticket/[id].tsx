@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, TouchableOpacity, FlatList, TextInput,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, ScrollView
+  KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView
 } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
@@ -62,6 +63,7 @@ export default function TicketDetailScreen() {
   const [changingStatus, setChangingStatus] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const { showModal, modalProps } = useAppModal();
 
   const isClosed = ticket?.status === "resolved" || ticket?.status === "closed";
 
@@ -149,7 +151,7 @@ export default function TicketDetailScreen() {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (error) {
       console.error("Message send error:", error);
-      Alert.alert("Error", "Could not send message.");
+      showModal({ title: "Error", message: "Could not send message.", variant: "error" });
       setInputText(text);
     } finally {
       setSending(false);
@@ -168,7 +170,7 @@ export default function TicketDetailScreen() {
       if (error) throw error;
       setTicket((prev) => prev ? { ...prev, status: newStatus } : prev);
     } catch {
-      Alert.alert("Error", "Could not update status.");
+      showModal({ title: "Error", message: "Could not update status.", variant: "error" });
     } finally {
       setChangingStatus(false);
     }
@@ -348,6 +350,7 @@ export default function TicketDetailScreen() {
           </View>
         )}
       </KeyboardAvoidingView>
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

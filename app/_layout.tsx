@@ -6,6 +6,20 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
+import { FloatingAudioPlayer } from "@/components/ui/FloatingAudioPlayer";
+import { registerForPushNotificationsAsync, savePushTokenToProfile } from "@/lib/pushNotifications";
+import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+
+let Notifications: any = null;
+const isExpoGoAndroid = Platform.OS === "android" && Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+if (!isExpoGoAndroid) {
+  try {
+    Notifications = require("expo-notifications");
+  } catch (e) {
+    console.warn("expo-notifications not available");
+  }
+}
 import "@/global.css";
 
 export { ErrorBoundary } from "expo-router";
@@ -87,12 +101,44 @@ function ThemeStatusBar() {
 }
 
 function RootLayoutNav() {
+  const { session } = useAuthStore();
+  const router = useRouter();
 
   useProtectedRoute();
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    
+    const userId = session.user.id;
+    // Register token
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) savePushTokenToProfile(userId, token);
+    });
+
+    // Tap listener for background/quit state pushes
+    let responseListener: any;
+    if (Notifications) {
+      responseListener = Notifications.addNotificationResponseReceivedListener((response: any) => {
+        const data = response.notification.request.content.data as any;
+        if (data?.reference_id) {
+          if (data.type === "new_message") {
+             router.push(`/chat/${data.reference_id}` as any);
+          } else if (data.type === "new_post" || data.type === "post_like" || data.type === "post_comment" || data.type === "comment_reply" || data.type === "mention") {
+             router.push(`/post/${data.reference_id}` as any);
+          }
+        }
+      });
+    }
+
+    return () => {
+      if (responseListener?.remove) responseListener.remove();
+    };
+  }, [session?.user?.id]);
 
   return (
     <>
       <ThemeStatusBar />
+      <FloatingAudioPlayer />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

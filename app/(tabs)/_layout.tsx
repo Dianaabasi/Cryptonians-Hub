@@ -21,10 +21,24 @@ export default function TabLayout() {
   const fetchGlobalUnreadChats = useCallback(async () => {
     if (!profile?.id) return;
     try {
+      // Only look at direct (1-on-1) chat rooms — exclude niche group chats
+      const { data: directRooms } = await supabase
+        .from("chat_rooms")
+        .select("id")
+        .eq("is_direct", true);
+
+      if (!directRooms?.length) {
+        setUnreadDmCount(0);
+        return;
+      }
+
+      const directRoomIds = directRooms.map((r) => r.id);
+
       const { data: participations } = await supabase
         .from("chat_participants")
         .select("chat_id, last_read_at")
-        .eq("user_id", profile.id);
+        .eq("user_id", profile.id)
+        .in("chat_id", directRoomIds);
 
       if (!participations?.length) {
         setUnreadDmCount(0);

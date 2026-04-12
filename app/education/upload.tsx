@@ -5,12 +5,12 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Modal,
 } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as DocumentPicker from "expo-document-picker";
@@ -46,6 +46,7 @@ export default function UploadMaterialScreen() {
   const [file, setFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const { showModal, modalProps } = useAppModal();
 
   const pickDocument = async () => {
     try {
@@ -59,7 +60,7 @@ export default function UploadMaterialScreen() {
       }
     } catch (err) {
       console.log(err);
-      Alert.alert("Error", "Could not pick document.");
+      showModal({ title: "Error", message: "Could not pick document.", variant: "error" });
     }
   };
 
@@ -67,22 +68,22 @@ export default function UploadMaterialScreen() {
     if (!profile?.id) return;
 
     if (!title.trim() || !description.trim()) {
-      Alert.alert("Required", "Please provide a title and description.");
+      showModal({ title: "Required", message: "Please provide a title and description.", variant: "warning" });
       return;
     }
 
     const finalCategory = category === "Custom" ? customCategory.trim() : category;
     if (!finalCategory) {
-      Alert.alert("Required", "Please provide a category.");
+      showModal({ title: "Required", message: "Please provide a category.", variant: "warning" });
       return;
     }
 
     if (uploadType === "link" && !linkUrl.trim()) {
-      Alert.alert("Required", "Please provide a valid link.");
+      showModal({ title: "Required", message: "Please provide a valid link.", variant: "warning" });
       return;
     }
     if (uploadType === "file" && !file) {
-      Alert.alert("Required", "Please select a PDF or DOCX file.");
+      showModal({ title: "Required", message: "Please select a PDF or DOCX file.", variant: "warning" });
       return;
     }
 
@@ -140,7 +141,7 @@ export default function UploadMaterialScreen() {
       console.error("Upload error dump:");
       console.log(JSON.stringify(e, null, 2));
       console.log(e.message || e);
-      Alert.alert("Upload Failed", e?.message || "Something went wrong. Please try again.");
+      showModal({ title: "Upload Failed", message: e?.message || "Something went wrong. Please try again.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -345,6 +346,7 @@ export default function UploadMaterialScreen() {
           </View>
         </View>
       </Modal>
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

@@ -20,7 +20,6 @@ import {
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Linking,
   Modal,
@@ -31,6 +30,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -102,6 +102,7 @@ function NewTicketModal({
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [subjectOpen, setSubjectOpen] = useState(false);
+  const { showModal, modalProps } = useAppModal();
 
   const reset = () => {
     setSubject(SUBJECTS[0]);
@@ -111,10 +112,7 @@ function NewTicketModal({
 
   const handleSubmit = async () => {
     if (!message.trim()) {
-      Alert.alert(
-        "Required",
-        "Please fill in your message.",
-      );
+      showModal({ title: "Required", message: "Please fill in your message.", variant: "warning" });
       return;
     }
     setLoading(true);
@@ -135,170 +133,173 @@ function NewTicketModal({
       onCreated();
     } catch (error) {
       console.error("Ticket creation error:", error);
-      Alert.alert("Error", "Could not create ticket. Please try again.");
+      showModal({ title: "Error", message: "Could not create ticket. Please try again.", variant: "error" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={onClose}
-    >
-      <View
-        className="flex-1"
-        style={{ backgroundColor: isDark ? "#121212" : "#F8F8F8" }}
+    <>
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
       >
-        {/* Header */}
         <View
-          className="flex-row items-center justify-between px-5 pt-5 pb-4 border-b"
-          style={{ borderColor: isDark ? "#2C2C2E" : "#E5E7EB" }}
+          className="flex-1"
+          style={{ backgroundColor: isDark ? "#121212" : "#F8F8F8" }}
         >
-          <Text className="text-xl font-bold" style={{ color: colors.text }}>
-            New Ticket
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              reset();
-              onClose();
-            }}
-            className="p-1"
+          {/* Header */}
+          <View
+            className="flex-row items-center justify-between px-5 pt-5 pb-4 border-b"
+            style={{ borderColor: isDark ? "#2C2C2E" : "#E5E7EB" }}
           >
-            <X size={22} color={colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          className="flex-1 px-5 pt-5"
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Subject picker */}
-          <Text
-            className="text-sm font-semibold mb-2"
-            style={{ color: colors.textSecondary }}
-          >
-            Subject
-          </Text>
-          <TouchableOpacity
-            onPress={() => setSubjectOpen(!subjectOpen)}
-            className="flex-row items-center justify-between px-4 py-3.5 rounded-2xl mb-1"
-            style={{
-              backgroundColor: isDark ? "#1C1C1E" : "#FFF",
-              borderWidth: 1,
-              borderColor: isDark ? "#2C2C2E" : "#E5E7EB",
-            }}
-          >
-            <Text style={{ color: colors.text }}>{subject}</Text>
-            <ChevronRight
-              size={16}
-              color={colors.textSecondary}
-              style={{
-                transform: [{ rotate: subjectOpen ? "-90deg" : "90deg" }],
+            <Text className="text-xl font-bold" style={{ color: colors.text }}>
+              New Ticket
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                reset();
+                onClose();
               }}
-            />
-          </TouchableOpacity>
-          {subjectOpen && (
-            <View
-              className="rounded-2xl mb-3 overflow-hidden"
+              className="p-1"
+            >
+              <X size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            className="flex-1 px-5 pt-5"
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Subject picker */}
+            <Text
+              className="text-sm font-semibold mb-2"
+              style={{ color: colors.textSecondary }}
+            >
+              Subject
+            </Text>
+            <TouchableOpacity
+              onPress={() => setSubjectOpen(!subjectOpen)}
+              className="flex-row items-center justify-between px-4 py-3.5 rounded-2xl mb-1"
               style={{
                 backgroundColor: isDark ? "#1C1C1E" : "#FFF",
                 borderWidth: 1,
                 borderColor: isDark ? "#2C2C2E" : "#E5E7EB",
               }}
             >
-              {SUBJECTS.map((s, i) => (
-                <TouchableOpacity
-                  key={s}
-                  onPress={() => {
-                    setSubject(s);
-                    setSubjectOpen(false);
-                  }}
-                  className="px-4 py-3 flex-row items-center"
-                  style={{
-                    backgroundColor:
-                      subject === s ? "#6C63FF15" : "transparent",
-                    borderTopWidth: i > 0 ? 1 : 0,
-                    borderColor: isDark ? "#2C2C2E" : "#F3F4F6",
-                  }}
-                >
-                  <View
-                    className="w-2 h-2 rounded-full mr-3"
+              <Text style={{ color: colors.text }}>{subject}</Text>
+              <ChevronRight
+                size={16}
+                color={colors.textSecondary}
+                style={{
+                  transform: [{ rotate: subjectOpen ? "-90deg" : "90deg" }],
+                }}
+              />
+            </TouchableOpacity>
+            {subjectOpen && (
+              <View
+                className="rounded-2xl mb-3 overflow-hidden"
+                style={{
+                  backgroundColor: isDark ? "#1C1C1E" : "#FFF",
+                  borderWidth: 1,
+                  borderColor: isDark ? "#2C2C2E" : "#E5E7EB",
+                }}
+              >
+                {SUBJECTS.map((s, i) => (
+                  <TouchableOpacity
+                    key={s}
+                    onPress={() => {
+                      setSubject(s);
+                      setSubjectOpen(false);
+                    }}
+                    className="px-4 py-3 flex-row items-center"
                     style={{
                       backgroundColor:
-                        subject === s ? "#6C63FF" : "transparent",
-                    }}
-                  />
-                  <Text
-                    style={{
-                      color: subject === s ? "#6C63FF" : colors.text,
-                      fontWeight: subject === s ? "700" : "400",
+                        subject === s ? "#6C63FF15" : "transparent",
+                      borderTopWidth: i > 0 ? 1 : 0,
+                      borderColor: isDark ? "#2C2C2E" : "#F3F4F6",
                     }}
                   >
-                    {s}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                    <View
+                      className="w-2 h-2 rounded-full mr-3"
+                      style={{
+                        backgroundColor:
+                          subject === s ? "#6C63FF" : "transparent",
+                      }}
+                    />
+                    <Text
+                      style={{
+                        color: subject === s ? "#6C63FF" : colors.text,
+                        fontWeight: subject === s ? "700" : "400",
+                      }}
+                    >
+                      {s}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
 
-          {/* Message */}
-          <Text
-            className="text-sm font-semibold mb-2"
-            style={{ color: colors.textSecondary }}
-          >
-            Message
-          </Text>
-          <TextInput
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Describe your issue in detail…"
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            numberOfLines={5}
-            textAlignVertical="top"
-            className="px-4 py-3.5 rounded-2xl text-base mb-8"
+            {/* Message */}
+            <Text
+              className="text-sm font-semibold mb-2"
+              style={{ color: colors.textSecondary }}
+            >
+              Message
+            </Text>
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              placeholder="Describe your issue in detail…"
+              placeholderTextColor={colors.textSecondary}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              className="px-4 py-3.5 rounded-2xl text-base mb-8"
+              style={{
+                backgroundColor: isDark ? "#1C1C1E" : "#FFF",
+                color: colors.text,
+                minHeight: 120,
+                borderWidth: 1,
+                borderColor: isDark ? "#2C2C2E" : "#E5E7EB",
+              }}
+            />
+          </ScrollView>
+
+          {/* Submit */}
+          <View
+            className="px-5 pb-8 pt-3"
             style={{
-              backgroundColor: isDark ? "#1C1C1E" : "#FFF",
-              color: colors.text,
-              minHeight: 120,
-              borderWidth: 1,
+              borderTopWidth: 1,
               borderColor: isDark ? "#2C2C2E" : "#E5E7EB",
             }}
-          />
-        </ScrollView>
-
-        {/* Submit */}
-        <View
-          className="px-5 pb-8 pt-3"
-          style={{
-            borderTopWidth: 1,
-            borderColor: isDark ? "#2C2C2E" : "#E5E7EB",
-          }}
-        >
-          <TouchableOpacity
-            onPress={handleSubmit}
-            disabled={loading}
-            className="flex-row items-center justify-center py-4 rounded-2xl"
-            style={{ backgroundColor: "#6C63FF", opacity: loading ? 0.7 : 1 }}
           >
-            {loading ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <>
-                <Send size={18} color="#FFF" />
-                <Text className="text-white font-bold text-base ml-2">
-                  Submit Ticket
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={loading}
+              className="flex-row items-center justify-center py-4 rounded-2xl"
+              style={{ backgroundColor: "#6C63FF", opacity: loading ? 0.7 : 1 }}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <>
+                  <Send size={18} color="#FFF" />
+                  <Text className="text-white font-bold text-base ml-2">
+                    Submit Ticket
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      <AppModal {...modalProps} />
+    </>
   );
 }
 

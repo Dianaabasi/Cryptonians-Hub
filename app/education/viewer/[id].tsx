@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Image } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { WebView } from "react-native-webview";
@@ -15,6 +16,8 @@ interface Material {
   title: string;
   material_url: string;
   material_type: string;
+  article_content?: string;
+  cover_image_url?: string;
   status: string;
   upvotes: number;
   custom_author?: string | null;
@@ -40,6 +43,7 @@ export default function EducationViewerScreen() {
   const [hasUpvoted, setHasUpvoted] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const [upvotes, setUpvotes] = useState(0);
+  const { showModal, modalProps } = useAppModal();
 
   useEffect(() => {
     fetchMaterial();
@@ -55,6 +59,8 @@ export default function EducationViewerScreen() {
           title, 
           material_url, 
           material_type, 
+          article_content,
+          cover_image_url,
           status, 
           upvotes, 
           custom_author,
@@ -76,7 +82,7 @@ export default function EducationViewerScreen() {
 
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Could not load material.");
+      showModal({ title: "Error", message: "Could not load material.", variant: "error" });
       router.back();
     } finally {
       setLoading(false);
@@ -121,31 +127,52 @@ export default function EducationViewerScreen() {
     if (!material) return;
     try {
       await supabase.from("education_materials").update({ status: "approved" }).eq("id", material.id);
-      Alert.alert("Approved", "This material is now public.", [{ text: "OK", onPress: () => router.back() }]);
+      showModal({ title: "Approved", message: "This material is now public.", variant: "success", buttons: [{ text: "OK", style: "default", onPress: () => router.back() }] });
     } catch {
-      Alert.alert("Error", "Could not approve.");
+      showModal({ title: "Error", message: "Could not approve.", variant: "error" });
     }
   };
 
   const handleReject = async () => {
     if (!material) return;
-    Alert.alert("Reject Material", "Permanently delete this submission?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-        try {
-          await supabase.from("education_materials").delete().eq("id", material.id);
-          router.back();
-        } catch {
-          Alert.alert("Error", "Could not reject.");
-        }
-      }}
-    ]);
+    showModal({
+      title: "Reject Material",
+      message: "Permanently delete this submission?",
+      variant: "confirm",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
+        { text: "Delete", style: "destructive", onPress: async () => {
+          try {
+            await supabase.from("education_materials").delete().eq("id", material.id);
+            router.back();
+          } catch {
+            showModal({ title: "Error", message: "Could not reject.", variant: "error" });
+          }
+        }},
+      ],
+    });
   };
 
   if (loading) {
     return (
-      <SafeAreaView className="flex-1 justify-center items-center" style={{ backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color="#6C63FF" />
+      <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }}>
+        <View className="px-5 pt-4 pb-3 flex-row items-center border-b justify-between" style={{ borderColor: isDark ? "#2C2C2E" : "#F3F4F6" }}>
+          <View className="w-6 h-6 rounded-md mr-4" style={{ backgroundColor: isDark ? "#2C2C2E" : "#F3F4F6" }} />
+          <View className="flex-1 space-y-2">
+            <View className="h-4 w-3/4 rounded bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+            <View className="h-3 w-1/2 rounded bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          </View>
+        </View>
+        <View className="flex-1 p-5">
+          <View className="w-full h-48 rounded-xl mb-6 bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          <View className="h-4 w-full rounded mb-3 bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          <View className="h-4 w-11/12 rounded mb-3 bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          <View className="h-4 w-full rounded mb-3 bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          <View className="h-4 w-4/5 rounded mb-3 bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          <View className="h-4 w-full rounded mb-3 bg-gray-200 mt-6" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          <View className="h-4 w-10/12 rounded mb-3 bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+          <View className="h-4 w-full rounded mb-3 bg-gray-200" style={{ backgroundColor: isDark ? "#2C2C2E" : "#E5E7EB" }} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -183,69 +210,85 @@ export default function EducationViewerScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={["top", "left", "right"]}>
-      {/* Header */}
-      <View className="px-5 pt-4 pb-3 flex-row items-center border-b justify-between" style={{ borderColor: isDark ? "#2C2C2E" : "#F3F4F6" }}>
-        <View className="flex-row items-center flex-1">
-          <TouchableOpacity onPress={() => router.back()} className="mr-4">
-            <ArrowLeft size={24} color={colors.text} />
-          </TouchableOpacity>
-          <View className="flex-1">
-            <Text className="text-base font-bold" style={{ color: colors.text }} numberOfLines={1}>
-              {material.title}
-            </Text>
-            <View className="flex-row items-center mt-0.5">
-              {material.custom_author ? (
-                <>
-                  <Text className="text-[10px] font-bold" style={{ color: colors.textSecondary }}>
-                    Author: {material.custom_author}
-                  </Text>
-                  <Text className="text-[10px] mx-1" style={{ color: colors.textSecondary }}>•</Text>
-                </>
-              ) : null}
-              <Text className="text-[10px]" style={{ color: colors.textSecondary }}>
-                Uploaded by: {material.author?.full_name || "Unknown"}
+    <>
+      <SafeAreaView className="flex-1" style={{ backgroundColor: colors.background }} edges={["top", "left", "right"]}>
+        {/* Header */}
+        <View className="px-5 pt-4 pb-3 flex-row items-center border-b justify-between" style={{ borderColor: isDark ? "#2C2C2E" : "#F3F4F6" }}>
+          <View className="flex-row items-center flex-1">
+            <TouchableOpacity onPress={() => router.back()} className="mr-4">
+              <ArrowLeft size={24} color={colors.text} />
+            </TouchableOpacity>
+            <View className="flex-1">
+              <Text className="text-base font-bold" style={{ color: colors.text }} numberOfLines={1}>
+                {material.title}
               </Text>
+              <View className="flex-row items-center mt-0.5">
+                {material.custom_author ? (
+                  <>
+                    <Text className="text-[10px] font-bold" style={{ color: colors.textSecondary }}>
+                      Author: {material.custom_author}
+                    </Text>
+                    <Text className="text-[10px] mx-1" style={{ color: colors.textSecondary }}>•</Text>
+                  </>
+                ) : null}
+                <Text className="text-[10px]" style={{ color: colors.textSecondary }}>
+                  Uploaded by: {material.author?.full_name || "Unknown"}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
 
-      {/* Reader Body */}
-      <View className="flex-1">
-        {renderWebView()}
-      </View>
+        {/* Reader Body */}
+        <View className="flex-1">
+          {material.material_type === "article" ? (
+            <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+              {material.cover_image_url && (
+                <View className="w-full h-48 rounded-2xl mb-6 overflow-hidden bg-gray-200">
+                  <Image source={{ uri: material.cover_image_url }} className="w-full h-full" resizeMode="cover" />
+                </View>
+              )}
+              <Text className="text-lg leading-loose" style={{ color: colors.text }}>
+                {material.article_content || "This article has no content."}
+              </Text>
+            </ScrollView>
+          ) : (
+            renderWebView()
+          )}
+        </View>
 
-      {/* Bottom Action Bar */}
-      <View className="px-6 py-4 flex-row items-center justify-between border-t border-b-0 pb-8" style={{ backgroundColor: colors.background, borderColor: isDark ? "#2C2C2E" : "#F3F4F6" }}>
-        {isAdmin && material.status === "pending" ? (
-          <>
-            <TouchableOpacity onPress={handleReject} className="flex-row items-center gap-2 bg-red-500/10 px-6 py-3 rounded-xl border border-red-500/30">
-              <XCircle size={20} color="#EF4444" />
-              <Text className="text-red-500 font-bold">Reject</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleApprove} className="flex-row items-center gap-2 bg-emerald-500/10 px-6 py-3 rounded-xl border border-emerald-500/30">
-              <CheckCircle size={20} color="#10B981" />
-              <Text className="text-emerald-500 font-bold">Approve</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TouchableOpacity onPress={toggleUpvote} className={`flex-row items-center gap-2 px-6 py-3 rounded-xl border ${hasUpvoted ? "bg-[#6C63FF]/10 border-[#6C63FF]/30" : (isDark ? "bg-[#1C1C1E] border-[#2C2C2E]" : "bg-white border-gray-200")}`}>
-              <ThumbsUp size={20} color={hasUpvoted ? "#6C63FF" : colors.textSecondary} />
-              <Text style={{ color: hasUpvoted ? "#6C63FF" : colors.text, fontWeight: "bold" }}>
-                {upvotes} Upvotes
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={toggleSave} className={`flex-row items-center gap-2 px-6 py-3 rounded-xl border ${hasSaved ? "bg-amber-500/10 border-amber-500/30" : (isDark ? "bg-[#1C1C1E] border-[#2C2C2E]" : "bg-white border-gray-200")}`}>
-              <Bookmark size={20} color={hasSaved ? "#F59E0B" : colors.textSecondary} />
-              <Text style={{ color: hasSaved ? "#F59E0B" : colors.text, fontWeight: "bold" }}>
-                {hasSaved ? "Saved" : "Save"}
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </SafeAreaView>
+        {/* Bottom Action Bar */}
+        <View className="px-6 py-4 flex-row items-center justify-between border-t border-b-0 pb-8" style={{ backgroundColor: colors.background, borderColor: isDark ? "#2C2C2E" : "#F3F4F6" }}>
+          {isAdmin && material.status === "pending" ? (
+            <>
+              <TouchableOpacity onPress={handleReject} className="flex-row items-center gap-2 bg-red-500/10 px-6 py-3 rounded-xl border border-red-500/30">
+                <XCircle size={20} color="#EF4444" />
+                <Text className="text-red-500 font-bold">Reject</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleApprove} className="flex-row items-center gap-2 bg-emerald-500/10 px-6 py-3 rounded-xl border border-emerald-500/30">
+                <CheckCircle size={20} color="#10B981" />
+                <Text className="text-emerald-500 font-bold">Approve</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity onPress={toggleUpvote} className={`flex-row items-center gap-2 px-6 py-3 rounded-xl border ${hasUpvoted ? "bg-[#6C63FF]/10 border-[#6C63FF]/30" : (isDark ? "bg-[#1C1C1E] border-[#2C2C2E]" : "bg-white border-gray-200")}`}>
+                <ThumbsUp size={20} color={hasUpvoted ? "#6C63FF" : colors.textSecondary} />
+                <Text style={{ color: hasUpvoted ? "#6C63FF" : colors.text, fontWeight: "bold" }}>
+                  {upvotes} Upvotes
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleSave} className={`flex-row items-center gap-2 px-6 py-3 rounded-xl border ${hasSaved ? "bg-amber-500/10 border-amber-500/30" : (isDark ? "bg-[#1C1C1E] border-[#2C2C2E]" : "bg-white border-gray-200")}`}>
+                <Bookmark size={20} color={hasSaved ? "#F59E0B" : colors.textSecondary} />
+                <Text style={{ color: hasSaved ? "#F59E0B" : colors.text, fontWeight: "bold" }}>
+                  {hasSaved ? "Saved" : "Save"}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+      <AppModal {...modalProps} />
+    </>
   );
 }

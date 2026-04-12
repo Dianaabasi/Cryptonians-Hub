@@ -18,9 +18,10 @@ import {
   XCircle
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   FlatList,
   Modal,
@@ -40,6 +41,8 @@ interface Material {
   id: string;
   title: string;
   description: string;
+  article_content?: string;
+  cover_image_url?: string;
   material_type: string;
   category: string;
   difficulty: string;
@@ -147,6 +150,7 @@ export default function EducationScreen() {
   const [materialToOptions, setMaterialToOptions] = useState<Material | null>(null);
   const [materialToDelete, setMaterialToDelete] = useState<Material | null>(null);
   const [isDeletingMaterial, setIsDeletingMaterial] = useState(false);
+  const { showModal, modalProps: appModalProps } = useAppModal();
 
   // Success / Error Alerts
   const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; description: string; type: "success" | "error" | "info" }>({
@@ -155,6 +159,8 @@ export default function EducationScreen() {
     description: "",
     type: "info"
   });
+
+  const [fabModalVisible, setFabModalVisible] = useState(false);
 
   const fetchMaterials = async () => {
     if (!profile?.id) return;
@@ -261,24 +267,26 @@ export default function EducationScreen() {
     }
   };
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 0.5,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
+  useFocusEffect(
+    useCallback(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(fadeAnim, {
+            toValue: 0.5,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]),
+      ).start();
 
-    fetchMaterials();
-  }, [profile?.id, activeTab, activeCategory, filterDifficulty, filterType]);
+      fetchMaterials();
+    }, [profile?.id, activeTab, activeCategory, filterDifficulty, filterType]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -289,16 +297,10 @@ export default function EducationScreen() {
     if (!profile?.id) return;
     const isUpvoted = mat.hasUpvoted;
 
-    // Optimistic UI
+    // Only optimistically flip the icon state, NOT the count
     setMaterials((prev) =>
       prev.map((m) =>
-        m.id === mat.id
-          ? {
-              ...m,
-              hasUpvoted: !isUpvoted,
-              upvotes: isUpvoted ? m.upvotes - 1 : m.upvotes + 1,
-            }
-          : m,
+        m.id === mat.id ? { ...m, hasUpvoted: !isUpvoted } : m,
       ),
     );
 
@@ -313,9 +315,27 @@ export default function EducationScreen() {
           .from("education_upvotes")
           .insert({ user_id: profile.id, material_id: mat.id });
       }
+
+      // Count real upvotes directly from junction table — bypasses any DB trigger drift
+      const { count } = await supabase
+        .from("education_upvotes")
+        .select("*", { count: "exact", head: true })
+        .eq("material_id", mat.id);
+
+      if (count !== null) {
+        setMaterials((prev) =>
+          prev.map((m) =>
+            m.id === mat.id ? { ...m, upvotes: count } : m,
+          ),
+        );
+      }
     } catch {
-      // Revert if error
-      fetchMaterials();
+      // Revert icon state on error
+      setMaterials((prev) =>
+        prev.map((m) =>
+          m.id === mat.id ? { ...m, hasUpvoted: isUpvoted } : m,
+        ),
+      );
     }
   };
 
@@ -361,7 +381,7 @@ export default function EducationScreen() {
       setMaterialToDelete(null);
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Could not delete material.");
+      showModal({ title: "Error", message: "Could not delete material.", variant: "error" });
     } finally {
       setIsDeletingMaterial(false);
     }
@@ -392,18 +412,17 @@ export default function EducationScreen() {
   };
 
   const handleReject = async (id: string, name: string) => {
-    Alert.alert(
-      "Reject Material",
-      `Are you sure you want to permanently delete "${name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
+    showModal({
+      title: "Reject Material",
+      message: `Are you sure you want to permanently delete "${name}"?`,
+      variant: "confirm",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Delete",
           style: "destructive",
           onPress: async () => {
             try {
-              // Delete from DB. Storage trigger or scheduled cron can cleanup abandoned files,
-              // or handle storage deletion right here if we grabbed the URL.
               await supabase.from("education_materials").delete().eq("id", id);
               setMaterials((prev) => prev.filter((m) => m.id !== id));
               setAlertConfig({
@@ -418,7 +437,7 @@ export default function EducationScreen() {
           },
         },
       ],
-    );
+    });
   };
 
   const renderMaterial = ({ item }: { item: Material }) => {
@@ -435,8 +454,18 @@ export default function EducationScreen() {
         }`}
       >
         {/* Link materials: full-width banner preview ABOVE the content row */}
+        {/* Link materials: full-width banner preview ABOVE the content row */}
           {item.material_type === "link" && (
             <OGImagePreview url={item.material_url} isDark={isDark} />
+          )}
+
+        {/* Article Custom Native Cover */}
+          {item.material_type === "article" && item.cover_image_url && (
+            <Image 
+              source={{ uri: item.cover_image_url }} 
+              className="w-full h-40 rounded-2xl mb-4 bg-gray-200" 
+              resizeMode="cover" 
+            />
           )}
 
         <View className="flex-row">
@@ -481,7 +510,7 @@ export default function EducationScreen() {
                   {item.category}
                 </Text>
               </View>
-              {item.difficulty && (
+              {item.difficulty && item.material_type !== "article" && (
                 <View className="bg-amber-500/10 px-2 py-1 rounded-md">
                   <Text className="text-[10px] uppercase font-bold text-amber-500">
                     {item.difficulty}
@@ -503,7 +532,7 @@ export default function EducationScreen() {
               </Text>
             ) : null}
             <Text className="text-[9px]" style={{ color: colors.textSecondary }}>
-              Uploaded by: {item.author?.full_name || "Unknown"}
+              {item.material_type === "article" ? "Posted by" : "Uploaded by"}: {item.author?.full_name || "Unknown"}
             </Text>
             <Text className="text-[9px] mt-0.5" style={{ color: colors.textSecondary, opacity: 0.8 }}>
               {new Date(item.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
@@ -980,7 +1009,7 @@ export default function EducationScreen() {
 
       {/* Upload FAB */}
       <TouchableOpacity
-        onPress={() => router.push("/education/upload")}
+        onPress={() => setFabModalVisible(true)}
         className="absolute right-5 w-14 h-14 bg-[#6C63FF] rounded-full items-center justify-center shadow-lg"
         style={{
           bottom: 100,
@@ -994,6 +1023,45 @@ export default function EducationScreen() {
         <Plus size={24} color="#FFF" />
       </TouchableOpacity>
 
+      <Modal visible={fabModalVisible} transparent animationType="fade">
+        <TouchableOpacity 
+          activeOpacity={1} 
+          onPress={() => setFabModalVisible(false)}
+          className="flex-1 bg-black/50 justify-end"
+        >
+          <View className="p-5 pb-10" style={{ backgroundColor: isDark ? "#1C1C1E" : "#FFF", borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
+            <View className="w-12 h-1.5 bg-gray-300 rounded-full self-center mb-6" />
+            <Text className="text-xl font-bold mb-6 text-center" style={{ color: colors.text }}>Create New</Text>
+            
+            <TouchableOpacity 
+              onPress={() => { setFabModalVisible(false); router.push("/education/create-article"); }}
+              className={`flex-row items-center p-4 mb-4 rounded-2xl border ${isDark ? "bg-[#2C2C2E] border-[#3C3C3E]" : "bg-gray-50 border-gray-200"}`}
+            >
+              <View className="w-12 h-12 rounded-full bg-[#6C63FF]/10 items-center justify-center mr-4">
+                <FileText size={24} color="#6C63FF" />
+              </View>
+              <View>
+                <Text className="font-bold text-lg" style={{ color: colors.text }}>Create Article</Text>
+                <Text className="text-sm mt-0.5" style={{ color: colors.textSecondary }}>Write a native long-form post</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={() => { setFabModalVisible(false); router.push("/education/upload"); }}
+              className={`flex-row items-center p-4 rounded-2xl border ${isDark ? "bg-[#2C2C2E] border-[#3C3C3E]" : "bg-gray-50 border-gray-200"}`}
+            >
+              <View className="w-12 h-12 rounded-full bg-[#6C63FF]/10 items-center justify-center mr-4">
+                <Plus size={24} color="#6C63FF" />
+              </View>
+              <View>
+                <Text className="font-bold text-lg" style={{ color: colors.text }}>Upload Material</Text>
+                <Text className="text-sm mt-0.5" style={{ color: colors.textSecondary }}>Share a PDF document or Link</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       <AlertModal
         visible={alertConfig.visible}
         title={alertConfig.title}
@@ -1001,6 +1069,7 @@ export default function EducationScreen() {
         type={alertConfig.type}
         onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
       />
+      <AppModal {...appModalProps} />
     </SafeAreaView>
   );
 }

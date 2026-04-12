@@ -7,15 +7,15 @@ import {
   ActivityIndicator,
   RefreshControl,
   Image,
-  Alert,
   Modal,
   TextInput,
   FlatList,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
 import { useThemeStore } from "@/stores/themeStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -57,6 +57,8 @@ export default function ChatsScreen() {
   const [searchResults, setSearchResults] = useState<UserResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [startingChat, setStartingChat] = useState<string | null>(null);
+  const [localSearchQuery, setLocalSearchQuery] = useState("");
+  const { showModal, modalProps } = useAppModal();
 
   const fetchChats = async () => {
     if (!profile?.id) return;
@@ -131,10 +133,11 @@ export default function ChatsScreen() {
 
       setChats(formatted);
 
-      // Update tab badge with total unread DM count
+      // Update tab badge: only count unread DMs (is_direct=true is already ensured by fetchChats query)
       const unread = formatted.filter((c) => {
         const msg = c.latest_message;
         if (!msg || msg.sender_id === profile?.id) return false;
+        // Only count messages from others that we haven't read yet
         return msg._my_last_read_at
           ? new Date(msg.created_at) > new Date(msg._my_last_read_at)
           : true;
@@ -148,9 +151,11 @@ export default function ChatsScreen() {
     }
   };
 
-  useEffect(() => {
-    fetchChats();
-  }, [profile?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchChats();
+    }, [profile?.id])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -203,7 +208,7 @@ export default function ChatsScreen() {
       router.push(`/chat/${chatId}` as any);
     } catch (e: any) {
       console.error(e);
-      Alert.alert("Error", e?.message || "Could not start chat. Please try again.");
+      showModal({ title: "Error", message: e?.message || "Could not start chat. Please try again.", variant: "error" });
     } finally {
       setStartingChat(null);
     }
@@ -238,6 +243,17 @@ export default function ChatsScreen() {
     if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
     return `${Math.floor(diff / 86400)}d`;
   };
+
+  const filteredChats = chats.filter((chat) => {
+    if (!localSearchQuery.trim()) return true;
+    const meta = getChatMeta(chat);
+    if (!meta) return true;
+    const q = localSearchQuery.toLowerCase();
+    return (
+      (meta.title && meta.title.toLowerCase().includes(q)) ||
+      (meta.subtitle && meta.subtitle.toLowerCase().includes(q))
+    );
+  });
 
   const renderChatRow = (chat: ChatRoom) => {
     const meta = getChatMeta(chat);
@@ -502,17 +518,22 @@ export default function ChatsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar (static placeholder for now) */}
+      {/* Search Bar */}
       <View className="px-5 mb-4">
         <View
-          className={`flex-row items-center px-4 py-2.5 rounded-full ${
+          className={`flex-row items-center px-4 py-1.5 rounded-full ${
             isDark ? "bg-[#1C1C1E]" : "bg-gray-100"
           }`}
         >
           <Search size={18} color={colors.textSecondary} />
-          <Text className="ml-2 font-medium" style={{ color: colors.textSecondary }}>
-            Search messages...
-          </Text>
+          <TextInput
+            className="ml-2 flex-1 font-medium text-base h-10"
+            style={{ color: colors.text }}
+            placeholder="Search messages..."
+            placeholderTextColor={colors.textSecondary}
+            value={localSearchQuery}
+            onChangeText={setLocalSearchQuery}
+          />
         </View>
       </View>
 
@@ -541,8 +562,8 @@ export default function ChatsScreen() {
             />
           }
         >
-          {chats.length > 0 ? (
-            chats.map(renderChatRow)
+          {filteredChats.length > 0 ? (
+            filteredChats.map(renderChatRow)
           ) : (
             <View className="py-20 items-center justify-center">
               <View className="w-20 h-20 rounded-full bg-[#6C63FF]/10 items-center justify-center mb-4">
@@ -568,6 +589,7 @@ export default function ChatsScreen() {
       )}
 
       {renderNewChatModal()}
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

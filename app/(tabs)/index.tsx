@@ -61,38 +61,43 @@ export default function HomeScreen() {
 
   const fetchPosts = async () => {
     try {
-      // Fetch niche memberships if profile is available
-      const nicheIds: string[] = [];
+      let query = supabase
+        .from("posts")
+        .select(`
+          id, content, image_url, is_job_post, is_announcement, created_at,
+          niche:niches(id, name),
+          author:author_id(id, full_name, username, avatar_url, role),
+          likes:likes(count), comments:comments(count)
+        `)
+        .order("created_at", { ascending: false });
+
       if (profile?.id) {
+        // Fetch niche memberships
         const { data: memberships } = await supabase
           .from("niche_memberships")
           .select("niche_id")
           .eq("user_id", profile.id);
-        if (memberships) nicheIds.push(...memberships.map((m) => m.niche_id));
-      }
+          
+        const nicheIds = memberships?.map((m) => m.niche_id) || [];
 
-      let query = supabase
-        .from("posts")
-        .select(`
-          id,
-          content,
-          image_url,
-          is_job_post,
-          is_announcement,
-          created_at,
-          niche:niches(id, name),
-          author:author_id(id, full_name, username, avatar_url, role),
-          likes:likes(count),
-          comments:comments(count)
-        `)
-        .order("created_at", { ascending: false });
+        if (nicheIds.length > 0) {
+          query = query.or(`niche_id.is.null,niche_id.in.(${nicheIds.join(",")})`);
+        } else {
+          query = query.is("niche_id", null);
+        }
 
-      if (nicheIds.length > 0) {
-        // Show global posts + posts from joined niches
-        query = query.or(`niche_id.is.null,niche_id.in.(${nicheIds.join(",")})`);
+        // Exclude reported posts
+        const { data: reported } = await supabase
+          .from("reported_posts")
+          .select("post_id")
+          .eq("user_id", profile.id);
+        
+        const reportedIds = reported?.map(r => r.post_id) || [];
+        if (reportedIds.length > 0) {
+          query = query.filter("id", "not.in", `(${reportedIds.join(",")})`);
+        }
       } else {
-        // No niche memberships — show only global posts
-        query = query.is("niche_id", null);
+         query = query.is("niche_id", null);
       }
 
       const { data, error } = await query;
@@ -123,6 +128,16 @@ export default function HomeScreen() {
   // Runs once on mount AND again when profile loads (profile starts as null)
   useEffect(() => {
     fetchPosts();
+
+    const channel = supabase.channel('public:posts')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
+        fetchPosts(); // silently pull new content when a post drops
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.id]);
 
   const onRefresh = useCallback(() => {

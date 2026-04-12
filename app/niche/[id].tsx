@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View, Text, TouchableOpacity, ScrollView, RefreshControl,
-  Image, ActivityIndicator, Alert, Modal, Platform
+  Image, ActivityIndicator, Modal, Platform
 } from "react-native";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 import { useAuthStore } from "@/stores/authStore";
@@ -33,6 +34,7 @@ function RequestsModal({
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const { showModal, modalProps: reqModalProps } = useAppModal();
 
   useEffect(() => {
     if (visible && nicheId) {
@@ -58,7 +60,7 @@ function RequestsModal({
       setRequests(data || []);
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", "Could not load requests.");
+      showModal({ title: "Error", message: "Could not load requests.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -108,7 +110,7 @@ function RequestsModal({
       }
     } catch (e) {
       console.error(e);
-      Alert.alert("Error", `Could not ${action} request.`);
+      showModal({ title: "Error", message: `Could not ${action} request.`, variant: "error" });
     } finally {
       setProcessingId(null);
     }
@@ -179,6 +181,7 @@ function RequestsModal({
           )}
         </View>
       </View>
+      <AppModal {...reqModalProps} />
     </Modal>
   );
 }
@@ -211,6 +214,8 @@ export default function NicheDetailsScreen() {
   const [joining, setJoining] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
   const [showRequests, setShowRequests] = useState(false);
+  const [hasUnreadNicheChat, setHasUnreadNicheChat] = useState(false);
+  const { showModal, modalProps } = useAppModal();
 
   const isAdminOrMod = profile?.role === "admin" || profile?.role === "mod";
 
@@ -308,6 +313,41 @@ export default function NicheDetailsScreen() {
           has_liked: false,
         })) as PostType[]);
       }
+      // Check for unread niche group chat messages
+      if (membership && profile) {
+        const { data: groupRoom } = await supabase
+          .from("chat_rooms")
+          .select("id")
+          .eq("niche_id", id)
+          .eq("is_direct", false)
+          .limit(1)
+          .maybeSingle();
+
+        if (groupRoom) {
+          const { data: myPart } = await supabase
+            .from("chat_participants")
+            .select("last_read_at")
+            .eq("chat_id", groupRoom.id)
+            .eq("user_id", profile.id)
+            .maybeSingle();
+
+          const { data: latestMsg } = await supabase
+            .from("chat_messages")
+            .select("created_at, sender_id")
+            .eq("chat_id", groupRoom.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (latestMsg && latestMsg.sender_id !== profile.id) {
+            const isUnread = !myPart?.last_read_at ||
+              new Date(latestMsg.created_at) > new Date(myPart.last_read_at);
+            setHasUnreadNicheChat(isUnread);
+          } else {
+            setHasUnreadNicheChat(false);
+          }
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -316,7 +356,11 @@ export default function NicheDetailsScreen() {
     }
   };
 
-  useEffect(() => { fetchNicheData(); }, [id, profile?.id]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchNicheData();
+    }, [id, profile?.id])
+  );
 
   const onRefresh = () => { setRefreshing(true); fetchNicheData(); };
 
@@ -404,7 +448,7 @@ export default function NicheDetailsScreen() {
 
       setNiche({ ...niche, banner_url: urlData.publicUrl });
     } catch (e: any) {
-      Alert.alert("Upload Failed", e.message || "Could not upload banner.");
+      showModal({ title: "Upload Failed", message: e.message || "Could not upload banner.", variant: "error" });
     } finally {
       setUploadingBanner(false);
     }
@@ -576,10 +620,15 @@ export default function NicheDetailsScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          className={`flex-1 items-center pb-3 pt-3 border-b-2 border-transparent`}
+          className={`flex-1 items-center pb-3 pt-3 border-b-2 border-transparent relative`}
           onPress={handleOpenChat}
         >
           <Text className="font-bold text-sm text-gray-500">Live Chat</Text>
+          {hasUnreadNicheChat && (
+            <View
+              className="absolute top-2.5 right-[28%] w-2 h-2 rounded-full bg-[#6C63FF]"
+            />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -679,6 +728,7 @@ export default function NicheDetailsScreen() {
         colors={colors}
         onActionComplete={fetchNicheData}
       />
+      <AppModal {...modalProps} />
     </SafeAreaView>
   );
 }

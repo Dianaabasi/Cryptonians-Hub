@@ -5,7 +5,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
@@ -18,12 +17,14 @@ import { StepIndicator } from "@/components/ui/StepIndicator";
 import { ArrowLeft } from "lucide-react-native";
 import { TouchableOpacity } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 
 const SIGNUP_DATA_KEY = "@cryptonians_signup_data";
 
 export default function SignupScreen() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const { showModal, modalProps } = useAppModal();
   const [formData, setFormData] = useState<SignupFormData>(INITIAL_SIGNUP_DATA);
   const [errors, setErrors] = useState<Partial<Record<keyof SignupFormData, string>>>({});
   const [loading, setLoading] = useState(false);
@@ -158,7 +159,7 @@ export default function SignupScreen() {
       });
 
       if (error) {
-        Alert.alert("Signup Error", error.message);
+        showModal({ title: "Signup Error", message: error.message, variant: "error" });
         return;
       }
 
@@ -167,7 +168,7 @@ export default function SignupScreen() {
         params: { email: formData.email, mode: "signup" },
       });
     } catch (err) {
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      showModal({ title: "Error", message: "Something went wrong. Please try again.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -353,6 +354,7 @@ export default function SignupScreen() {
           />
         </View>
       </ScrollView>
+      <AppModal {...modalProps} />
     </KeyboardAvoidingView>
   );
 }

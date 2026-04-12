@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from "react";
-import { View, Text, Alert, Image, TouchableOpacity } from "react-native";
+import { View, Text, Image, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
@@ -7,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { OtpInput } from "@/components/ui/OtpInput";
 import { ArrowLeft } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AppModal, useAppModal } from "@/components/ui/AppModal";
 
 const SIGNUP_DATA_KEY = "@cryptonians_signup_data";
 
@@ -17,6 +19,7 @@ export default function VerifyScreen() {
   }>();
   const router = useRouter();
   const { fetchProfile } = useAuthStore();
+  const { showModal, modalProps } = useAppModal();
   const [code, setCode] = useState(["", "", "", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(60);
@@ -40,7 +43,7 @@ export default function VerifyScreen() {
   const handleVerify = async () => {
     const otpCode = code.join("");
     if (otpCode.length !== 8) {
-      Alert.alert("Error", "Please enter the complete 8-digit code");
+      showModal({ title: "Invalid Code", message: "Please enter the complete 8-digit code.", variant: "error" });
       return;
     }
 
@@ -53,7 +56,7 @@ export default function VerifyScreen() {
       });
 
       if (error) {
-        Alert.alert("Verification Failed", error.message);
+        showModal({ title: "Verification Failed", message: error.message, variant: "error" });
         setCode(["", "", "", "", "", "", "", ""]);
         return;
       }
@@ -65,7 +68,7 @@ export default function VerifyScreen() {
 
       // Auth state listener in the store will handle navigation
     } catch (err) {
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      showModal({ title: "Error", message: "Something went wrong. Please try again.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -116,13 +119,13 @@ export default function VerifyScreen() {
       });
 
       if (error) {
-        Alert.alert("Error", error.message);
+        showModal({ title: "Error", message: error.message, variant: "error" });
         return;
       }
 
       setResendTimer(60);
       setCanResend(false);
-      Alert.alert("Code Sent", "A new verification code has been sent to your email.");
+      showModal({ title: "Code Sent", message: "A new verification code has been sent to your email.", variant: "success" });
 
       // Restart timer
       const interval = setInterval(() => {
@@ -136,63 +139,66 @@ export default function VerifyScreen() {
         });
       }, 1000);
     } catch {
-      Alert.alert("Error", "Failed to resend code. Please try again.");
+      showModal({ title: "Error", message: "Failed to resend code. Please try again.", variant: "error" });
     }
   };
 
   return (
-    <View className="flex-1 bg-[#0A0A0A]">
-      {/* Header */}
-      <View className="flex-row items-center px-5 pt-14 pb-4">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
-          <ArrowLeft size={24} color="#FAFAFA" />
-        </TouchableOpacity>
-      </View>
+    <>
+      <View className="flex-1 bg-[#0A0A0A]">
+        {/* Header */}
+        <View className="flex-row items-center px-5 pt-14 pb-4">
+          <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
+            <ArrowLeft size={24} color="#FAFAFA" />
+          </TouchableOpacity>
+        </View>
 
-      <View className="flex-1 px-6 justify-center">
-        <View className="items-center mb-10">
-          {/* Email icon circle */}
-          <View className="w-20 h-20 rounded-full bg-[#6C63FF]/10 items-center justify-center mb-6">
-            <Text className="text-4xl">📧</Text>
+        <View className="flex-1 px-6 justify-center">
+          <View className="items-center mb-10">
+            {/* Email icon circle */}
+            <View className="w-20 h-20 rounded-full bg-[#6C63FF]/10 items-center justify-center mb-6">
+              <Text className="text-4xl">📧</Text>
+            </View>
+
+            <Text className="text-white text-2xl font-bold mb-3 text-center">
+              Check your email
+            </Text>
+            <Text className="text-[#A1A1AA] text-base text-center leading-6">
+              We've sent a 6-digit verification code to{"\n"}
+              <Text className="text-white font-medium">{email}</Text>
+            </Text>
           </View>
 
-          <Text className="text-white text-2xl font-bold mb-3 text-center">
-            Check your email
-          </Text>
-          <Text className="text-[#A1A1AA] text-base text-center leading-6">
-            We've sent a 6-digit verification code to{"\n"}
-            <Text className="text-white font-medium">{email}</Text>
-          </Text>
-        </View>
+          {/* OTP Input */}
+          <View className="mb-8">
+            <OtpInput code={code} setCode={setCode} length={8} />
+          </View>
 
-        {/* OTP Input */}
-        <View className="mb-8">
-          <OtpInput code={code} setCode={setCode} length={8} />
-        </View>
+          <Button
+            title="Verify"
+            onPress={handleVerify}
+            loading={loading}
+            disabled={code.join("").length !== 8}
+          />
 
-        <Button
-          title="Verify"
-          onPress={handleVerify}
-          loading={loading}
-          disabled={code.join("").length !== 8}
-        />
-
-        {/* Resend */}
-        <View className="items-center mt-6">
-          {canResend ? (
-            <TouchableOpacity onPress={handleResend}>
-              <Text className="text-[#6C63FF] font-semibold text-sm">
-                Resend Code
+          {/* Resend */}
+          <View className="items-center mt-6">
+            {canResend ? (
+              <TouchableOpacity onPress={handleResend}>
+                <Text className="text-[#6C63FF] font-semibold text-sm">
+                  Resend Code
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Text className="text-[#71717A] text-sm">
+                Resend code in{" "}
+                <Text className="text-white font-medium">{resendTimer}s</Text>
               </Text>
-            </TouchableOpacity>
-          ) : (
-            <Text className="text-[#71717A] text-sm">
-              Resend code in{" "}
-              <Text className="text-white font-medium">{resendTimer}s</Text>
-            </Text>
-          )}
+            )}
+          </View>
         </View>
       </View>
-    </View>
+      <AppModal {...modalProps} />
+    </>
   );
 }

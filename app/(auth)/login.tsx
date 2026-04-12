@@ -5,10 +5,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  Alert,
   TouchableOpacity,
   Dimensions,
+  Modal,
 } from "react-native";
+import { useAppModal, AppModal as StyledAppModal } from "@/components/ui/AppModal";
 import { useRouter } from "expo-router";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +24,8 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSignupModal, setShowSignupModal] = useState(false);
+  const { showModal, modalProps } = useAppModal();
 
   const validateEmail = (): boolean => {
     if (!email.trim()) {
@@ -44,10 +47,17 @@ export default function LoginScreen() {
     try {
       const { error: otpError } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
+        options: {
+          shouldCreateUser: false,
+        },
       });
 
       if (otpError) {
-        Alert.alert("Login Error", otpError.message);
+        if (otpError.message.toLowerCase().includes("signups not allowed") || otpError.message.toLowerCase().includes("not found")) {
+          setShowSignupModal(true);
+        } else {
+          showModal({ title: "Login Error", message: otpError.message, variant: "error" });
+        }
         return;
       }
 
@@ -56,7 +66,7 @@ export default function LoginScreen() {
         params: { email: email.trim().toLowerCase(), mode: "login" },
       });
     } catch (err) {
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      showModal({ title: "Error", message: "Something went wrong. Please try again.", variant: "error" });
     } finally {
       setLoading(false);
     }
@@ -127,6 +137,41 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Unregistered Account Modal */}
+      <Modal visible={showSignupModal} transparent animationType="fade" onRequestClose={() => setShowSignupModal(false)}>
+        <TouchableOpacity activeOpacity={1} className="flex-1 bg-black/60 justify-center items-center px-6" onPress={() => setShowSignupModal(false)}>
+          <View className="bg-[#1C1C1E] rounded-3xl w-full p-8 shadow-2xl items-center border border-[#2C2C2E]">
+            <View className="w-16 h-16 rounded-full bg-[#6C63FF]/20 items-center justify-center mb-6">
+              <Text className="text-[#6C63FF] text-2xl font-bold">!</Text>
+            </View>
+            <Text className="text-white text-xl font-bold mb-3 text-center">Account not found, Signup</Text>
+            <Text className="text-[#A1A1AA] text-center mb-8 leading-6 text-base">
+              This email address doesn't match an existing account. Would you like to create a new one?
+            </Text>
+            
+            <View className="w-full flex-row gap-4">
+              <TouchableOpacity
+                className="flex-1 py-3.5 rounded-full bg-[#2C2C2E] items-center"
+                onPress={() => setShowSignupModal(false)}
+              >
+                <Text className="text-white font-semibold text-base">Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 py-3.5 rounded-full bg-[#6C63FF] items-center"
+                onPress={() => {
+                  setShowSignupModal(false);
+                  router.replace("/(auth)/signup");
+                }}
+              >
+                <Text className="text-white font-semibold text-base">Sign Up</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      <StyledAppModal {...modalProps} />
+
     </KeyboardAvoidingView>
   );
 }
